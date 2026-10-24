@@ -21,6 +21,20 @@ PLACEHOLDERS = {
     "meet_time": "When to meet in school, e.g. 3.30pm",
 }
 
+# Shown in any box that couldn't be worked out, so the messages always read
+# sensibly. Marked on the page as examples to replace.
+EXAMPLES = {
+    "day": "Friday",
+    "date": "28 Oct",
+    "time": "4.00pm-6.00pm",
+    "start": "4.00pm",
+    "location": "Ground Up",
+    "loc_short": "GU",
+    "mrt": "NE8 Farrer Park",
+    "meet_point": "Bencoolen Exit C",
+    "meet_time": "3.30pm",
+}
+
 DEFAULTS = {
     "welcome": """HII gang! Thanks for taking the time to join this week recre even though yall have mid terms coming up! Here are some impt info for this {day}'s session!
 
@@ -124,6 +138,16 @@ def guess(option_text, poll_date):
     values["meet_point"] = remembered.get("meet_point") or \
         store.load_config().get("meet_point", DEFAULT_MEET_POINT)
     return values
+
+
+def with_examples(values):
+    """Fill empty boxes with example values; returns (values, names of boxes that are examples)."""
+    filled, examples = dict(values), []
+    for k, example in EXAMPLES.items():
+        if not filled.get(k, "").strip():
+            filled[k] = example
+            examples.append(k)
+    return filled, examples
 
 
 def remember_place(values):

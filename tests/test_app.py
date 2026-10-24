@@ -105,7 +105,7 @@ def test_option_page_prefills(client, fake):
     html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
     assert "cut-off: first 20" in html
     assert 'value="28 Oct Recre @ B+ Aperia"' in html
-    assert 'value="7.30pm-9.30pm"' in html and 'value="7.00pm"' in html
+    assert "Welcome message" not in html  # that's on its own page now
     assert "Create group and add 20 people" in html
 
 
@@ -152,27 +152,11 @@ def test_full_run_with_progress_and_results(client, fake):
     assert any("Adding" in m for m in s["log"])
     html = client.get(loc).get_data(as_text=True)
     assert "Added" in html and "Invite link sent" in html and "Download Excel sheet" in html
-    assert "pinned" in html
+    assert "Next: welcome messages" in html
+    assert fake.group_posts == {}
     sheet = store.EXPORT_DIR / "28 Oct Recre @ B+ Aperia.xlsx"
     assert sheet.exists()
     assert client.get("/exports/28 Oct Recre @ B+ Aperia.xlsx").status_code == 200
-
-
-def test_remembers_place_details_after_run(client, fake):
-    fake.vote(OPT_A, [1])
-    loc = client.post("/run", data=run_form(location="B+ Aperia", mrt="DT21 Bencoolen", loc_short="B+",
-                                            meet_point="SOE Exit")).headers["Location"]
-    wait_for_job(client, loc)
-    html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
-    assert 'value="DT21 Bencoolen"' in html and 'value="SOE Exit"' in html
-
-
-def test_unticked_welcome_posts_nothing(client, fake):
-    fake.vote(OPT_A, [1])
-    form = run_form()
-    del form["post_welcome"]
-    wait_for_job(client, client.post("/run", data=form).headers["Location"])
-    assert fake.group_posts == {}
 
 
 def test_second_run_blocked_while_first_running(client, fake, monkeypatch):
@@ -249,3 +233,5 @@ def test_templates_partial_form_does_not_crash(client):
 def test_templates_back_link_stays_on_site(client):
     r = client.post("/templates", data=dict(welcome.DEFAULTS, back="https://evil.example.com"))
     assert "evil.example.com" not in r.headers["Location"]
+
+

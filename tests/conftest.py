@@ -56,6 +56,8 @@ class FakeTelegram:
         self.dms = {}               # user id -> [text]
         self.group_posts = {}       # group id -> [text or poll]
         self.pinned = {}            # group id -> message id
+        self.scheduled = []         # (group id, when, text or poll) waiting for Telegram to send
+        self.sent_log = {}          # group id -> [SimpleNamespace(id, message)] actually in the chat
         self.history_visible = set()
         self._next_id = 5000
 
@@ -123,7 +125,11 @@ class FakeTelegram:
                 return m
         return None
 
-    async def iter_messages(self, chat, limit=None, filter=None):
+    async def iter_messages(self, chat, limit=None, filter=None, from_user=None):
+        if getattr(chat, "id", None) in self.groups:  # messages in a session group, newest first
+            for m in list(reversed(self.sent_log.get(chat.id, [])))[:limit]:
+                yield m
+            return
         for m in [*self.extra_polls, self.poll_message()][:limit]:
             yield m
 
@@ -134,7 +140,11 @@ class FakeTelegram:
     async def get_participants(self, group):
         return [SimpleNamespace(id=uid) for uid in self.members[group.id]]
 
-    async def send_message(self, entity, message=None, file=None, link_preview=True):
+    async def send_message(self, entity, message=None, file=None, link_preview=True, schedule=None):
+        if schedule is not None:
+            self.scheduled.append((entity.id, schedule, file.poll if file else message))
+            self._next_id += 1
+            return SimpleNamespace(id=self._next_id)
         if isinstance(entity, types.User):
             if self.peer_flood_on_dm:
                 raise errors.PeerFloodError(None)
@@ -144,7 +154,19 @@ class FakeTelegram:
         else:
             self.group_posts.setdefault(entity.id, []).append(file.poll if file else message)
         self._next_id += 1
-        return SimpleNamespace(id=self._next_id)
+        msg = SimpleNamespace(id=self._next_id, message=message)
+        if not isinstance(entity, types.User):
+            self.sent_log.setdefault(entity.id, []).append(msg)
+        return msg
+
+    def deliver_scheduled(self):
+        """Telegram sends everything that was scheduled (with new message ids)."""
+        for gid, when, content in self.scheduled:
+            self._next_id += 1
+            self.group_posts.setdefault(gid, []).append(content)
+            self.sent_log.setdefault(gid, []).append(
+                SimpleNamespace(id=self._next_id, message=content if isinstance(content, str) else ""))
+        self.scheduled = []
 
     async def pin_message(self, group, msg, notify=False):
         self.pinned[group.id] = msg.id
@@ -213,10 +235,9 @@ def fake(monkeypatch, tmp_path):
     return f
 
 
-def run_option(fake, option=OPT_A, cap=20, title="28 Oct Recre @ B+ Aperia", welcome=None,
+def run_option(fake, option=OPT_A, cap=20, title="28 Oct Recre @ B+ Aperia",
                dm="Hi {name}! {option} {title} {link}"):
-    return tg.run(tg.run_option(CHAT, POLL_MSG, option.hex(), title, cap, dm, welcome=welcome,
-                                progress=lambda *a: None))
+    return tg.run(tg.run_option(CHAT, POLL_MSG, option.hex(), title, cap, dm, progress=lambda *a: None))
 
 
 def statuses(result):

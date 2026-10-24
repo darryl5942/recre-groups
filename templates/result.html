@@ -5,7 +5,8 @@
 <p class="muted">{{ r.option }} · {% if r.created %}group created{% else %}existing group{% endif %} · {{ r.member_count }} members now (including you)</p>
 
 {% if r.stopped %}<div class="flash error">{{ r.stopped }}</div>{% endif %}
-{% if r.welcome_posted %}<div class="flash info">Welcome messages and the meet-up poll were posted in the group, and the welcome message is pinned.</div>{% endif %}
+<p><a class="button" href="{{ url_for('messages', key=r.key) }}">Next: welcome messages →</a>
+  <span class="muted small">Send them now or schedule them, whenever you're ready.</span></p>
 
 {% set counts = {} %}
 {% for v in r.voters %}{% set _ = counts.update({v.status: counts.get(v.status, 0) + 1}) %}{% endfor %}

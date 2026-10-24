@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{{ url_for('groups') }}">← All groups</a> · <a href="{{ url_for('index') }}">Home</a></p>
+<h1>{{ group.title }}</h1>
+<p class="muted">{{ rec.option }} · {{ rec.poll }}</p>
+
+{% if history %}
+  <div class="card">
+    <h2>Already sent to this group</h2>
+    <ul class="plain-list">
+      {% for m in history %}
+        <li>{{ m.sent|join(", ")|capitalize }}: {% if m.scheduled %}scheduled for{% else %}sent{% endif %}
+          {{ (m.at.strftime("%a %d %b, %I.%M") ~ m.at.strftime("%p").lower()).replace(" 0", " ") }}</li>
+      {% endfor %}
+    </ul>
+    {% if pending_pins %}
+      <p class="muted small">The scheduled welcome message gets pinned the first time this app is open after it goes out.</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+<form method="post" id="msgform">
+  <input type="hidden" name="key" value="{{ key }}">
+
+  <section class="card">
+    <h2>Session details</h2>
+    <p class="muted small">The messages below update as you type. MRT, short name and meeting point are remembered for each place.
+      <a href="{{ url_for('edit_templates', back=request.full_path) }}">Edit the default templates</a></p>
+    {% if examples %}
+      <p class="flash warn small">Boxes marked <span class="tag">example</span> couldn't be read from the poll option,
+        so they show sample values. Replace them with this session's details.</p>
+    {% endif %}
+    <div class="fields">
+      {% for k, desc in placeholders.items() %}
+        <label>{{ k.replace("_", " ")|capitalize }}
+          {% if k in examples %}<span class="tag" data-tag="{{ k }}">example</span>{% endif %}
+          <input name="{{ k }}" value="{{ values[k] }}" placeholder="{{ desc }}" data-field
+                 class="{% if k in examples %}example{% endif %}">
+        </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Messages</h2>
+    <p class="muted small">Leave a message empty to skip it.</p>
+    <label>1. Welcome message <a href="#" class="refill small" data-for="welcome_text">↺ redo from template</a>
+      <textarea name="welcome_text" id="welcome_text" rows="14" data-template="welcome"></textarea>
+    </label>
+    <label class="check"><input type="checkbox" name="pin" value="1" checked> Pin the welcome message</label>
+    <label>2. Meeting message <a href="#" class="refill small" data-for="meet_text">↺ redo from template</a>
+      <textarea name="meet_text" id="meet_text" rows="3" data-template="meet"></textarea>
+    </label>
+    <label>3. Poll question
+      <input name="poll_question" id="poll_question" data-template="poll_question">
+    </label>
+    <label>Poll options (one per line) <a href="#" class="refill small" data-for="poll_options">↺ redo from template</a>
+      <textarea name="poll_options" id="poll_options" rows="3" data-template="poll_options"></textarea>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>When</h2>
+    <label class="check"><input type="radio" name="when_mode" value="now" checked> Send now</label>
+    <label class="check"><input type="radio" name="when_mode" value="schedule"> Schedule for</label>
+    <input type="datetime-local" name="when" id="when" value="{{ default_when }}" class="when" disabled>
+    <p class="muted small" id="schedule_note" hidden>Telegram sends scheduled messages itself, so your computer can be off by then.
+      You'll see them in the group under the clock icon, where you can edit or cancel them.
+      The welcome message gets pinned the first time this app is open after it goes out.</p>
+    <button id="send_btn">Send now</button>
+  </section>
+</form>
+
+<script>
+  const templates = {{ templates|tojson }};
+  const fields = [...document.querySelectorAll("[data-field]")];
+  const outputs = [...document.querySelectorAll("[data-template]")];
+  const edited = new Set();  // messages the captain changed by hand stay as they are
+
+  function values() {
+    return Object.fromEntries(fields.map(f => [f.name, f.value.trim()]));
+  }
+  function fillAll() {
+    const v = values();
+    for (const out of outputs) {
+      if (edited.has(out.id)) continue;
+      out.value = templates[out.dataset.template].replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
+    }
+    for (const f of fields) f.classList.toggle("missing", !f.value.trim());
+  }
+  fields.forEach(f => f.addEventListener("input", () => {
+    f.classList.remove("example");  // edited, so no longer a sample value
+    document.querySelector(`[data-tag="${f.name}"]`)?.remove();
+    fillAll();
+  }));
+  outputs.forEach(o => o.addEventListener("input", () => edited.add(o.id)));
+  document.querySelectorAll(".refill").forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    edited.delete(a.dataset.for);
+    fillAll();
+  }));
+  fillAll();
+
+  const when = document.getElementById("when");
+  const btn = document.getElementById("send_btn");
+  document.querySelectorAll("[name=when_mode]").forEach(r => r.addEventListener("change", () => {
+    const scheduled = document.querySelector("[name=when_mode]:checked").value === "schedule";
+    when.disabled = !scheduled;
+    document.getElementById("schedule_note").hidden = !scheduled;
+    btn.textContent = scheduled ? "Schedule messages" : "Send now";
+  }));
+
+  document.getElementById("msgform").addEventListener("submit", e => {
+    const label = f => f.name.replace("_", " ");
+    const empty = fields.filter(f => !f.value.trim()).map(label);
+    const samples = fields.filter(f => f.classList.contains("example")).map(label);
+    const problems = [];
+    if (samples.length) problems.push("still showing example values: " + samples.join(", "));
+    if (empty.length) problems.push("empty: " + empty.join(", "));
+    if (problems.length && !confirm("Some session details are " + problems.join("; ") + ".\n\nSend anyway?")) {
+      e.preventDefault();
+      return;
+    }
+    if (!when.disabled && (!when.value || new Date(when.value) <= new Date())) {
+      alert("Pick a time in the future to schedule the messages for.");
+      e.preventDefault();
+      return;
+    }
+    btn.disabled = true;
+  });
+</script>
+{% endblock %}

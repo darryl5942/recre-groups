@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{{ url_for('index') }}">← Home</a></p>
+<h1>Groups</h1>
+<p class="muted">Every session group this app has made on this computer, newest first.</p>
+
+{% for r in rows %}
+  <section class="card">
+    <h2>{{ r.title }}</h2>
+    <p class="muted small">{{ r.option }} · {{ r.poll }}</p>
+    <p class="small">
+      {% if r.messages %}
+        {% set last = r.messages[-1] %}
+        ✓ Welcome messages {% if last.scheduled %}scheduled{% else %}sent{% endif %}
+      {% else %}
+        <span class="bad">Welcome messages not sent yet</span>
+      {% endif %}
+    </p>
+    <p class="row-links">
+      <a class="button" href="{{ url_for('messages', key=r.key) }}">Welcome messages</a>
+      <a href="{{ url_for('option', chat=r.chat_id, msg=r.msg_id, opt=r.opt) }}">Add new voters</a>
+    </p>
+  </section>
+{% else %}
+  <p class="muted">No groups yet. Pick a poll option on the <a href="{{ url_for('index') }}">home page</a> to create one.</p>
+{% endfor %}
+{% endblock %}

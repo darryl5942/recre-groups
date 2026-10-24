@@ -3,14 +3,11 @@ import random
 from datetime import timedelta
 
 import pytest
-from telethon import types
 
 import store
 import tg
 from conftest import CHAT, ME, OPT_A, OPT_B, POLL_DATE, POLL_MSG, run_option, statuses, user
 
-WELCOME = {"welcome": "HII gang! {pinned}", "meet": "Meet us!", "poll_question": "Meet where!!!",
-           "poll_options": ["Bencoolen Exit C @ 3.30pm", "GU @ 4.00pm"]}
 
 
 def voters(fake, option=OPT_A):
@@ -86,21 +83,17 @@ def test_users_without_handle(fake):
 
 def test_first_run_creates_group_and_adds_first_20(fake):
     fake.vote(OPT_A, range(1, 26))
-    r = run_option(fake, welcome=WELCOME)
-    gid = store.get_record(store.record_key(CHAT, POLL_MSG, OPT_A.hex()))["group_id"]
-    assert r["created"]
+    r = run_option(fake)
+    rec = store.get_record(store.record_key(CHAT, POLL_MSG, OPT_A.hex()))
+    gid = rec["group_id"]
+    assert r["created"] and r["key"] == store.record_key(CHAT, POLL_MSG, OPT_A.hex())
+    assert rec["poll_date"] and rec["option"].startswith("28 Oct")
     assert fake.members[gid] == {ME, *range(1, 21)}
     s = statuses(r)
     assert all(s[i] == "Added" for i in range(1, 21))
     assert all(s[i] == "Not in first 20" for i in range(21, 26))
     assert gid in fake.history_visible
-    posts = fake.group_posts[gid]
-    assert posts[0] == WELCOME["welcome"] and posts[1] == WELCOME["meet"]
-    assert isinstance(posts[2], types.Poll)
-    assert [a.text.text for a in posts[2].answers] == WELCOME["poll_options"]
-    assert posts[2].public_voters
-    assert gid in fake.pinned
-    assert r["welcome_posted"]
+    assert gid not in fake.group_posts  # welcome messages are a separate step now
     assert fake.dms == {}
 
 
@@ -119,19 +112,17 @@ def test_run_with_no_voters_does_not_crash(fake):
 
 def test_rerun_10_then_25_adds_the_next_10_only(fake):
     fake.vote(OPT_A, range(1, 11))
-    first = run_option(fake, welcome=WELCOME)
+    first = run_option(fake)
     assert sum(s == "Added" for s in statuses(first).values()) == 10
 
     fake.vote(OPT_A, range(11, 26))
-    second = run_option(fake, welcome=None)
+    second = run_option(fake)
     s = statuses(second)
     assert not second["created"]
     assert [i for i in s if s[i] == "Already in group"] == list(range(1, 11))
     assert [i for i in s if s[i] == "Added"] == list(range(11, 21))
     assert [i for i in s if s[i] == "Not in first 20"] == list(range(21, 26))
     assert len(fake.groups) == 1
-    gid = next(iter(fake.groups))
-    assert len(fake.group_posts[gid]) == 3  # welcome not posted twice
 
 
 def test_cancellation_moves_21st_person_up(fake):
@@ -220,21 +211,18 @@ def test_flood_wait_stops_safely_and_rerun_continues(fake):
     fake.vote(OPT_A, range(1, 21))
     fake.privacy_block = {3}
     fake.flood_after = 5
-    r = run_option(fake, welcome=WELCOME)
+    r = run_option(fake)
     assert "slow down" in r["stopped"]
     s = statuses(r)
     assert sum(x == "Added" for x in s.values()) == 4  # #3 failed on privacy
     assert fake.dms == {}                    # stopped before messaging
-    gid = next(iter(fake.groups))
-    assert gid not in fake.group_posts      # and before posting the welcome
 
     fake.flood_after = None
-    r2 = run_option(fake, welcome=WELCOME)
+    r2 = run_option(fake)
     s2 = statuses(r2)
     assert r2["stopped"] is None
     assert sum(x in ("Added", "Already in group") for x in s2.values()) == 19
     assert s2[3] == "Invite link sent"
-    assert len(fake.group_posts[gid]) == 3
 
 
 def test_short_flood_wait_is_retried(fake, monkeypatch):
@@ -315,36 +303,6 @@ def test_two_options_get_two_groups(fake):
     assert len(fake.groups) == 2
 
 
-# ---------------------------------------------------------------- welcome posting
-
-def test_poll_options_cleaned_and_capped_at_10(fake):
-    fake.vote(OPT_A, [1])
-    w = dict(WELCOME, poll_options=["", "  "] + [f"Option {i}" for i in range(15)])
-    run_option(fake, welcome=w)
-    poll = fake.group_posts[next(iter(fake.groups))][2]
-    assert len(poll.answers) == 10
-
-
-def test_poll_skipped_with_fewer_than_two_options(fake):
-    fake.vote(OPT_A, [1])
-    run_option(fake, welcome=dict(WELCOME, poll_options=["Only one"]))
-    assert len(fake.group_posts[next(iter(fake.groups))]) == 2
-
-
-def test_empty_welcome_parts_are_skipped(fake):
-    fake.vote(OPT_A, [1])
-    run_option(fake, welcome={"welcome": " ", "meet": "", "poll_question": "", "poll_options": []})
-    gid = next(iter(fake.groups))
-    assert gid not in fake.group_posts and gid not in fake.pinned
-
-
-def test_very_long_texts_are_trimmed_for_poll(fake):
-    fake.vote(OPT_A, [1])
-    run_option(fake, welcome=dict(WELCOME, poll_question="Q" * 400, poll_options=["A" * 300, "B"]))
-    poll = fake.group_posts[next(iter(fake.groups))][2]
-    assert len(poll.question.text) == 255 and len(poll.answers[0].text.text) == 100
-
-
 # ---------------------------------------------------------------- chats and polls
 
 def test_resolve_chat(fake):
@@ -398,7 +356,7 @@ def test_stress_1000_voters_with_mixed_failures(fake):
     rng = random.Random(42)
     fake.privacy_block = set(rng.sample(range(1, 1001), 150))
     fake.dm_blocked = set(rng.sample(sorted(fake.privacy_block), 40))
-    r = run_option(fake, cap=300, welcome=WELCOME)
+    r = run_option(fake, cap=300)
     s = statuses(r)
     assert len(s) == 1000
     top = range(1, 301)

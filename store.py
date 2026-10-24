@@ -52,6 +52,10 @@ def get_record(key):
     return _read(_RECORDS, {}).get(key)
 
 
+def all_records():
+    return _read(_RECORDS, {})
+
+
 def save_record(key, record):
     records = _read(_RECORDS, {})
     records[key] = record

@@ -4,7 +4,9 @@ Run with start.bat (Windows) or start.sh (Mac), then open http://127.0.0.1:5050
 """
 import os
 import threading
+import time
 import uuid
+from datetime import datetime, timedelta, timezone
 import webbrowser
 from functools import wraps
 
@@ -165,9 +167,7 @@ def option():
     info = tg.run(tg.preview(chat_id, msg_id, opt, title, cap))
     return render_template("option.html", chat_id=chat_id, msg_id=msg_id, opt=opt, cap=cap,
                            title=title, option_text=option_text, info=info,
-                           dm=cfg.get("dm_template", DEFAULT_DM),
-                           values=welcome.guess(option_text, poll["date"]),
-                           placeholders=welcome.PLACEHOLDERS, templates=welcome.templates())
+                           dm=cfg.get("dm_template", DEFAULT_DM))
 
 
 @app.post("/run")
@@ -188,13 +188,6 @@ def run():
     dm = f.get("dm") or DEFAULT_DM
     store.update_config(cap=cap, dm_template=dm)
 
-    posts = None
-    if f.get("post_welcome"):
-        welcome.remember_place({k: f.get(k, "").strip() for k in welcome.PLACEHOLDERS})
-        posts = {"welcome": f.get("welcome_text", ""), "meet": f.get("meet_text", ""),
-                 "poll_question": f.get("poll_question", ""),
-                 "poll_options": f.get("poll_options", "").splitlines()}
-
     job_id = uuid.uuid4().hex
     job = _jobs[job_id] = {"done": False, "message": "Starting", "step": None, "total": None,
                            "log": [], "result": None, "sheet": None, "error": None,
@@ -206,8 +199,7 @@ def run():
 
     def work():
         try:
-            result = tg.run(tg.run_option(chat_id, msg_id, opt, title, cap, dm,
-                                          welcome=posts, progress=progress))
+            result = tg.run(tg.run_option(chat_id, msg_id, opt, title, cap, dm, progress=progress))
             job["sheet"] = export.write_run(result["title"], result["voters"], cap)
             job["result"] = result
         except tg.TgError as e:
@@ -235,11 +227,82 @@ def job_status(job_id):
     return jsonify({k: job[k] for k in ("done", "message", "step", "total", "log", "error")})
 
 
+def _split_key(key):
+    chat, msg, opt = key.split(":")
+    return int(chat), int(msg), opt
+
+
+@app.route("/groups")
+@needs_login
+def groups():
+    rows = []
+    for key, rec in store.all_records().items():
+        chat_id, msg_id, opt = _split_key(key)
+        rows.append({"key": key, "chat_id": chat_id, "msg_id": msg_id, "opt": opt, **rec})
+    rows.sort(key=lambda r: r.get("poll_date", ""), reverse=True)
+    return render_template("groups.html", rows=rows, me=tg.run(tg.me()))
+
+
+@app.route("/messages", methods=["GET", "POST"])
+@needs_login
+def messages():
+    key = request.values.get("key", "")
+    if key.count(":") != 2:
+        abort(400)
+    rec, group = tg.run(tg.record_group(key))
+
+    if request.method == "POST":
+        f = request.form
+        posts = {"welcome": f.get("welcome_text", ""), "meet": f.get("meet_text", ""),
+                 "poll_question": f.get("poll_question", ""),
+                 "poll_options": f.get("poll_options", "").splitlines()}
+        when = None
+        if f.get("when_mode") == "schedule":
+            try:
+                when = datetime.fromisoformat(f.get("when", "")).astimezone().astimezone(timezone.utc)
+            except ValueError:
+                flash("Pick the date and time to schedule the messages for.", "error")
+                return redirect(url_for("messages", key=key))
+        welcome.remember_place({k: f.get(k, "").strip() for k in welcome.PLACEHOLDERS})
+        sent = tg.run(tg.send_messages(key, posts, when=when, pin=bool(f.get("pin"))))
+        if not sent:
+            flash("Nothing was sent: all the messages were empty.", "error")
+        elif when:
+            local = when.astimezone()
+            nice = (local.strftime("%a %d %b, %I.%M") + local.strftime("%p").lower()).replace(" 0", " ")
+            flash(f"Scheduled the {', '.join(sent)} for {nice}. "
+                  "You can see or cancel them in Telegram (the clock icon in the group's message box).", "info")
+        else:
+            flash(f"Sent the {', '.join(sent)}.", "info")
+        return redirect(url_for("messages", key=key))
+
+    poll_date = datetime.fromisoformat(rec["poll_date"]) if rec.get("poll_date") else datetime.now(timezone.utc)
+    values, examples = welcome.with_examples(welcome.guess(rec.get("option", ""), poll_date))
+    default_when = (datetime.now() + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    history = [dict(m, at=datetime.fromisoformat(m["at"]).astimezone()) for m in rec.get("messages", [])]
+    return render_template("messages.html", key=key, rec=rec, group=group, values=values, examples=examples,
+                           placeholders=welcome.PLACEHOLDERS, templates=welcome.templates(),
+                           history=history, pending_pins=len(rec.get("pending_pins") or []),
+                           default_when=default_when.strftime("%Y-%m-%dT%H:%M"), me=tg.run(tg.me()))
+
+
+def _pin_scheduled_messages_forever():
+    """While the app is open, pin scheduled welcome messages once Telegram sends them."""
+    while True:
+        try:
+            if store.load_config().get("api_id") and tg.run(tg.is_logged_in()):
+                tg.run(tg.pin_due())
+        except Exception:
+            app.logger.exception("Pinning scheduled messages failed; will retry")
+        time.sleep(60)
+
+
 @app.route("/exports/<path:name>")
 def download(name):
     return send_from_directory(store.EXPORT_DIR, name, as_attachment=True)
 
 
 if __name__ == "__main__":
+    threading.Thread(target=_pin_scheduled_messages_forever, daemon=True).start()
     threading.Timer(1.0, lambda: webbrowser.open(f"http://127.0.0.1:{PORT}")).start()
     app.run(host="127.0.0.1", port=PORT, debug=False, threaded=True)

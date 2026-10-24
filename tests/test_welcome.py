@@ -96,3 +96,16 @@ def test_default_welcome_fills_completely(fake):
         "We'll be taking the MRT over :)")
     assert welcome.fill(welcome.DEFAULTS["poll_options"], v).splitlines() == [
         "Bencoolen Exit C @ 3.30pm", "GU @ 4.00pm"]
+
+
+def test_with_examples_fills_only_empty_boxes(fake):
+    v, ex = welcome.with_examples(welcome.guess("28 Oct 730pm-930pm @B+ Aperia", OCT))
+    assert v["date"] == "28 Oct" and v["location"] == "B+ Aperia"
+    assert v["mrt"] == welcome.EXAMPLES["mrt"] and ex == ["mrt"]
+    assert all(v[k].strip() for k in welcome.PLACEHOLDERS)
+
+
+def test_unreadable_option_is_all_examples_except_meet_point(fake):
+    v, ex = welcome.with_examples(welcome.guess("Can't make it", OCT))
+    assert set(ex) == set(welcome.PLACEHOLDERS) - {"meet_point"}
+    assert "{" not in welcome.fill(welcome.DEFAULTS["welcome"], v)

@@ -242,13 +242,17 @@ async def get_voters(chat_id, msg_id, option_hex):
 
 # ---------------------------------------------------------------- groups
 
+def _group_peer(rec):
+    return types.PeerChat(rec["group_id"]) if rec.get("basic") else types.PeerChannel(rec["group_id"])
+
+
 async def find_group(key, title, poll_date):
     """Existing group for this option: (entity, how) where how is 'record' or 'name'."""
     client = await _get_client()
     rec = store.get_record(key)
     if rec:
         try:
-            ent = await client.get_entity(types.PeerChannel(rec["group_id"]))
+            ent = await client.get_entity(_group_peer(rec))
             if not getattr(ent, "left", False):
                 return ent, "record"
         except (ValueError, errors.RPCError):
@@ -289,8 +293,7 @@ async def preview(chat_id, msg_id, option_hex, title, cap):
         else:
             v.status = "Will be added"
     return {"poll": poll, "voters": voters, "group": group, "found_by": how,
-            "member_count": len(members),
-            "welcome_posted": bool(group) and how == "record" and rec.get("welcome_posted", False)}
+            "member_count": len(members), "key": key if how == "record" else None}
 
 
 async def _pause(lo, hi):
@@ -350,32 +353,110 @@ def _fill(template, **values):
     return template
 
 
-async def _post_welcome(client, group, welcome):
-    """Post and pin the welcome message, then the meeting message and poll."""
-    if welcome["welcome"].strip():
-        msg = await client.send_message(group, welcome["welcome"], link_preview=False)
-        await client.pin_message(group, msg, notify=True)
-    if welcome["meet"].strip():
-        await client.send_message(group, welcome["meet"], link_preview=False)
-    options = [o.strip() for o in welcome["poll_options"] if o.strip()][:10]
-    if welcome["poll_question"].strip() and len(options) >= 2:
-        poll = types.Poll(
-            id=random.getrandbits(62), hash=0, public_voters=True,
-            question=types.TextWithEntities(welcome["poll_question"].strip()[:255], []),
-            answers=[types.PollAnswer(types.TextWithEntities(o[:100], []), bytes([i]))
-                     for i, o in enumerate(options)])
-        await client.send_message(group, file=types.InputMediaPoll(poll))
+# ---------------------------------------------------------------- group messages
+
+async def record_group(key):
+    """The group a run made for this poll option."""
+    rec = store.get_record(key)
+    if not rec:
+        raise TgError("No group has been made for this session yet.")
+    client = await _get_client()
+    try:
+        group = await client.get_entity(_group_peer(rec))
+    except (ValueError, errors.RPCError):
+        raise TgError(f"Couldn't open the group '{rec['title']}'. It may have been deleted, or you left it.")
+    if getattr(group, "left", False):
+        raise TgError(f"You're no longer in the group '{rec['title']}'.")
+    return rec, group
+
+
+async def send_messages(key, posts, when=None, pin=True):
+    """Send (or schedule for `when`) the welcome message, meeting message and poll.
+
+    posts: dict of welcome/meet/poll_question/poll_options. Blank parts are skipped.
+    Telegram itself delivers scheduled messages, so the computer can be off by then.
+    A scheduled welcome message is pinned the next time the app runs after it goes out.
+    """
+    if when is not None:
+        now = datetime.now(timezone.utc)
+        if when <= now + timedelta(seconds=30):
+            raise TgError("Pick a time at least a minute from now, or choose Send now.")
+        if when > now + timedelta(days=365):
+            raise TgError("Telegram can only schedule messages up to a year ahead.")
+    client = await _get_client()
+    rec, group = await record_group(key)
+    sent = []
+    try:
+        if posts["welcome"].strip():
+            msg = await client.send_message(group, posts["welcome"], link_preview=False, schedule=when)
+            sent.append("welcome message")
+            if pin and when is None:
+                await client.pin_message(group, msg, notify=True)
+            elif pin:
+                rec.setdefault("pending_pins", []).append(
+                    {"at": when.isoformat(), "text": posts["welcome"].strip()})
+        if posts["meet"].strip():
+            await client.send_message(group, posts["meet"], link_preview=False, schedule=when)
+            sent.append("meeting message")
+        options = [o.strip() for o in posts["poll_options"] if o.strip()][:10]
+        if posts["poll_question"].strip() and len(options) >= 2:
+            poll = types.Poll(
+                id=random.getrandbits(62), hash=0, public_voters=True,
+                question=types.TextWithEntities(posts["poll_question"].strip()[:255], []),
+                answers=[types.PollAnswer(types.TextWithEntities(o[:100], []), bytes([i]))
+                         for i, o in enumerate(options)])
+            await client.send_message(group, file=types.InputMediaPoll(poll), schedule=when)
+            sent.append("poll")
+    except errors.FloodWaitError as e:
+        raise TgError(f"Telegram says slow down: wait {e.seconds // 60 + 1} min and try again. "
+                      f"Already done: {', '.join(sent) or 'nothing'}.")
+    except errors.RPCError as e:
+        raise TgError(f"Telegram refused ({e.__class__.__name__}). Already done: {', '.join(sent) or 'nothing'}. "
+                      "Check you're still an admin of the group.")
+    finally:
+        if sent:
+            rec.setdefault("messages", []).append({
+                "sent": sent, "at": (when or datetime.now(timezone.utc)).isoformat(),
+                "scheduled": when is not None})
+            store.save_record(key, rec)
+    return sent
+
+
+async def pin_due():
+    """Pin scheduled welcome messages that Telegram has sent since the last check."""
+    client = await _get_client()
+    now = datetime.now(timezone.utc)
+    pinned = 0
+    for key, rec in store.all_records().items():
+        waiting = rec.get("pending_pins") or []
+        due = [p for p in waiting if datetime.fromisoformat(p["at"]) <= now]
+        if not due:
+            continue
+        try:
+            group = await client.get_entity(_group_peer(rec))
+            recent = [m async for m in client.iter_messages(group, limit=50, from_user="me")]
+        except (ValueError, errors.RPCError):
+            recent = []
+        for p in due:
+            match = next((m for m in recent if (m.message or "").strip() == p["text"]), None)
+            if match:
+                await client.pin_message(group, match, notify=True)
+                pinned += 1
+            elif now - datetime.fromisoformat(p["at"]) < timedelta(days=2):
+                continue  # not delivered yet (or deleted); keep trying for a while
+            waiting.remove(p)
+        rec["pending_pins"] = waiting
+        store.save_record(key, rec)
+    return pinned
 
 
 def _no_progress(message, done=None, total=None):
     print(message)
 
 
-async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template,
-                     welcome=None, progress=_no_progress):
+async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progress=_no_progress):
     """Create/reuse the group, add the first `cap` voters, DM the link to the rest.
 
-    welcome: dict of welcome/meet/poll_question/poll_options to post, or None.
     progress(message, done, total) is called as work happens.
     """
     client = await _get_client()
@@ -397,8 +478,8 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template,
         except errors.RPCError:
             pass
 
-    rec.update(group_id=group.id, title=getattr(group, "title", title),
-               poll=poll["question"], option=option_text)
+    rec.update(group_id=group.id, basic=isinstance(group, types.Chat), title=getattr(group, "title", title),
+               poll=poll["question"], option=option_text, poll_date=poll["date"].isoformat())
     store.save_record(key, rec)
 
     selected = [v for v in voters if v.position <= cap]
@@ -422,15 +503,6 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template,
     progress("Checking who is in the group")
     now_members = await member_ids(group)
     missing = [v for v in selected if v.id not in now_members]
-
-    if welcome and not stopped:
-        progress("Posting the welcome messages")
-        try:
-            await _post_welcome(client, group, welcome)
-            rec["welcome_posted"] = True
-        except errors.RPCError as e:
-            stopped = f"Couldn't post the welcome messages ({e.__class__.__name__})."
-        store.save_record(key, rec)
 
     if missing and not stopped and not rec.get("link"):
         try:
@@ -472,5 +544,4 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template,
 
     return {"poll": poll, "option": option_text, "voters": voters, "title": rec["title"],
             "created": created, "link": rec.get("link"), "stopped": stopped,
-            "member_count": len(now_members),
-            "welcome_posted": bool(welcome) and rec.get("welcome_posted", False)}
+            "member_count": len(now_members), "key": key}

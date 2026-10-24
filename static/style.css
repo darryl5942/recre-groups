@@ -54,7 +54,15 @@ nav { display: flex; gap: 16px; align-items: center; }
 label.check { display: flex; gap: 8px; align-items: center; font-weight: 600; }
 label.check input { width: auto; margin: 0; }
 .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 12px; margin: 8px 0; }
-input.missing { border-color: #e0a100; }
+input.missing, input.example { border-color: #e0a100; }
+input.example { font-style: italic; }
+.tag { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #9a6a00; background: #fff1c7; border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
+.flash.warn { background: var(--warn-bg); }
+.row-links { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 8px 0 0; }
+.plain-list { margin: 0; padding-left: 20px; }
+input.when { max-width: 260px; margin: 4px 0 12px 26px; }
+label.check { font-weight: 500; margin-bottom: 6px; }
 .refill { font-weight: 400; margin-left: 6px; }
 table.plain { display: table; border: 0; }
 .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin: 8px 0 12px; }
