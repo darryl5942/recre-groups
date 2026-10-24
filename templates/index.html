@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 <form method="get" class="card row">
-  <label>Chat with the polls
-    <select name="chat" onchange="this.form.submit()">
-      <option value="">— choose a group —</option>
-      {% for g in groups %}
-        <option value="{{ g.id }}" {% if g.id == chat_id %}selected{% endif %}>{{ g.name }}</option>
-      {% endfor %}
-    </select>
+  <label class="grow">Chat with the polls
+    <input name="q" list="chats" value="{{ chat_name }}" placeholder="Type a chat name, @username or t.me link"
+           autocomplete="off" onfocus="this.select()" onchange="this.form.submit()">
+    <datalist id="chats">
+      {% for g in groups %}<option value="{{ g.name }}">{% endfor %}
+    </datalist>
   </label>
+  <button>Show polls</button>
 </form>
 
 {% if chat_id and not polls %}
-  <p class="muted">No polls found in the latest messages of this chat.</p>
+  <p class="muted">No polls found in this chat.</p>
 {% endif %}
 
 {% for p in polls %}

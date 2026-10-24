@@ -88,12 +88,21 @@ def logout():
 def index():
     cfg = store.load_config()
     groups = tg.run(tg.list_groups())
-    chat_id = request.args.get("chat", type=int) or cfg.get("chat_id")
-    if chat_id and request.args.get("chat"):
+    typed = request.args.get("q", "").strip()
+    if typed:
+        try:
+            chat_id = tg.run(tg.resolve_chat(typed))
+        except tg.TgError as e:
+            flash(str(e), "error")
+            return render_template("index.html", groups=groups, chat_id=None, chat_name=typed,
+                                   polls=[], me=tg.run(tg.me()))
         store.update_config(chat_id=chat_id)
+    else:
+        chat_id = request.args.get("chat", type=int) or cfg.get("chat_id")
+    chat_name = next((g["name"] for g in groups if g["id"] == chat_id), "")
     polls = tg.run(tg.list_polls(chat_id)) if chat_id else []
-    return render_template("index.html", groups=groups, chat_id=chat_id, polls=polls,
-                           me=tg.run(tg.me()))
+    return render_template("index.html", groups=groups, chat_id=chat_id, chat_name=chat_name,
+                           polls=polls, me=tg.run(tg.me()))
 
 
 @app.route("/option")

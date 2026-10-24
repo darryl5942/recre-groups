@@ -11,7 +11,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from telethon import TelegramClient, errors, functions, types
+from telethon import TelegramClient, errors, functions, types, utils
 
 import store
 
@@ -131,19 +131,42 @@ async def log_out():
 # ---------------------------------------------------------------- polls
 
 async def list_groups():
+    """Groups and channels you're in (polls can be posted in either)."""
     client = await _get_client()
     return [
         {"id": d.id, "name": d.name}
-        async for d in client.iter_dialogs(limit=300)
-        if d.is_group
+        async for d in client.iter_dialogs()
+        if d.is_group or d.is_channel
     ]
 
 
-async def list_polls(chat_id, limit=10, scan=400):
-    """Most recent polls in a chat, newest first."""
+async def resolve_chat(text):
+    """Chat id from a typed name, @username or t.me link."""
+    text = text.strip()
+    groups = await list_groups()
+    exact = [g for g in groups if g["name"].lower() == text.lower()]
+    if exact:
+        return exact[0]["id"]
+    partial = [g for g in groups if text.lower() in g["name"].lower()]
+    if len(partial) == 1:
+        return partial[0]["id"]
+    if len(partial) > 1:
+        names = ", ".join(g["name"] for g in partial[:8])
+        raise TgError(f"Several chats match '{text}': {names}. Type more of the name.")
+    if text.startswith("@") or "t.me/" in text:
+        client = await _get_client()
+        try:
+            return utils.get_peer_id(await client.get_entity(text))
+        except (ValueError, errors.RPCError):
+            pass
+    raise TgError(f"No chat found matching '{text}'. You need to be a member of it.")
+
+
+async def list_polls(chat_id, limit=10):
+    """Most recent polls in a chat from anyone, newest first."""
     client = await _get_client()
     polls = []
-    async for m in client.iter_messages(chat_id, limit=scan):
+    async for m in client.iter_messages(chat_id, limit=limit, filter=types.InputMessagesFilterPoll()):
         if not isinstance(m.media, types.MessageMediaPoll):
             continue
         poll, results = m.media.poll, m.media.results
