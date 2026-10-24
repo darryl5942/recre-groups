@@ -121,7 +121,7 @@ def test_fill_links_location_when_map_link_given(fake):
     assert welcome.fill("[{date} {time}] @ {location}", v) == f"[28 Oct 4.00pm-6.00pm] @ [Ground Up]({MAP})"
 
 
-@pytest.mark.parametrize("link", ["", "   ", "maps.app.goo.gl/x", "not a link", "https://"])
+@pytest.mark.parametrize("link", ["", "   ", "not a link", "https://", "ground up", "maps", "https://nodot", "a b.com"])
 def test_fill_without_valid_map_link_keeps_plain_location(fake, link):
     assert welcome.fill("@ {location}", {"location": "Ground Up", "map_link": link}) == "@ Ground Up"
 
@@ -169,3 +169,42 @@ def test_map_link_remembered_per_place(fake):
 def test_map_link_never_gets_an_example_value(fake):
     _, ex = welcome.with_examples(welcome.guess("Can't make it", OCT))
     assert "map_link" not in ex
+
+
+USER_LINK = ("google.com/maps/place/Fat+Cow+-+Japanese+Wagyu+@+Camden+Medical+Centre/@1.2998376,103.8548992,15z/"
+             "data=!3m1!5s0x31da198b8e323299:0x8a271da618c8886!4m6!3m5!1s0x31da19898122216d:0x924451ca79d17f5d!8m2!"
+             "3d1.3033039!4d103.8239218!16s%2Fg%2F1vcjjs6m?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D")
+
+
+@pytest.mark.parametrize("link,expected", [
+    (USER_LINK, "https://" + USER_LINK),
+    ("maps.app.goo.gl/AbC123", "https://maps.app.goo.gl/AbC123"),
+    ("www.google.com/maps/place/GU", "https://www.google.com/maps/place/GU"),
+    ("  https://maps.app.goo.gl/AbC123  ", "https://maps.app.goo.gl/AbC123"),
+    ("HTTP://Example.com/x", "HTTP://Example.com/x"),
+    ("https://www.google.com/maps/place/Climb+(Central)", "https://www.google.com/maps/place/Climb+%28Central%29"),
+])
+def test_normalize_link(link, expected):
+    assert welcome.normalize_link(link) == expected
+
+
+def test_users_google_maps_link_end_to_end(fake):
+    v = welcome.guess("28 Oct 4pm-6pm @Ground Up", OCT)
+    v["map_link"] = USER_LINK
+    plain, links = welcome.parse_links(welcome.fill(welcome.DEFAULTS["welcome"], v))
+    assert "[28 Oct 4.00pm-6.00pm] @ Ground Up" in plain and "google.com" not in plain
+    (offset, length, url), = links
+    assert url == "https://" + USER_LINK
+    assert plain.encode("utf-16-le")[offset * 2:(offset + length) * 2].decode("utf-16-le") == "Ground Up"
+
+
+def test_link_with_brackets_is_not_cut_short(fake):
+    v = {"location": "Climb Central", "map_link": "https://www.google.com/maps/place/Climb+(Central)/@1,2"}
+    plain, links = welcome.parse_links(welcome.fill("@ {location}!", v))
+    assert plain == "@ Climb Central!"
+    assert links[0][2] == "https://www.google.com/maps/place/Climb+%28Central%29/@1,2"
+
+
+def test_link_saved_with_https(fake):
+    welcome.remember_place({"location": "Fat Cow", "map_link": USER_LINK})
+    assert welcome.guess("1 Nov 4pm-6pm @Fat Cow", OCT)["map_link"] == "https://" + USER_LINK

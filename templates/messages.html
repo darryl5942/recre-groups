@@ -35,7 +35,7 @@
         <label>{{ k.replace("_", " ")|capitalize }}
           {% if k in examples %}<span class="tag" data-tag="{{ k }}">example</span>{% endif %}
           <input name="{{ k }}" value="{{ values[k] }}" placeholder="{{ desc }}" data-field
-                 {% if k in optional %}data-optional{% endif %}{% if k == "map_link" %} type="url"{% endif %}
+                 {% if k in optional %}data-optional{% endif %}{% if k == "map_link" %} inputmode="url" autocomplete="off"{% endif %}
                  class="{% if k in examples %}example{% endif %}">
         </label>
       {% endfor %}
@@ -80,10 +80,22 @@
   const outputs = [...document.querySelectorAll("[data-template]")];
   const edited = new Set();  // messages the captain changed by hand stay as they are
 
+  // Same rules as normalize_link() in welcome.py: add https:// if missing, encode brackets.
+  function normalizeLink(url) {
+    url = (url || "").trim();
+    if (!url || /\s/.test(url)) return "";
+    if (!/^https?:\/\//i.test(url)) {
+      if (!/^(www\.)?[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/|$|\?)/i.test(url)) return "";
+      url = "https://" + url;
+    }
+    if (!/^https?:\/\/[\w-]+(\.[\w-]+)*\.[a-z]{2,}/i.test(url)) return "";
+    return url.replace(/\(/g, "%28").replace(/\)/g, "%29");
+  }
   function values() {
     const v = Object.fromEntries(fields.map(f => [f.name, f.value.trim()]));
-    if (/^https?:\/\/\S+$/.test(v.map_link || "") && v.location) {
-      v.location = `[${v.location}](${v.map_link})`;  // sent as a clickable link
+    const link = normalizeLink(v.map_link);
+    if (link && v.location) {
+      v.location = `[${v.location}](${link})`;  // sent as a clickable link
     }
     return v;
   }
@@ -121,8 +133,8 @@
     const label = f => f.name.replace("_", " ");
     const empty = fields.filter(f => !f.value.trim() && !("optional" in f.dataset)).map(label);
     const map = fields.find(f => f.name === "map_link");
-    if (map && map.value.trim() && !/^https?:\/\/\S+$/.test(map.value.trim())) {
-      alert("The map link should start with https:// (copy it from Google Maps → Share → Copy link).");
+    if (map && map.value.trim() && !normalizeLink(map.value)) {
+      alert("That map link doesn't look like a web address. In Google Maps, use Share → Copy link and paste it here.");
       e.preventDefault();
       return;
     }

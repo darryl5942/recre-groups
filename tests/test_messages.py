@@ -328,7 +328,7 @@ def test_scheduled_linked_welcome_still_gets_pinned(fake, group, monkeypatch):
 
 def test_messages_page_has_optional_map_link(client, fake, group):
     html = client.get(f"/messages?key={KEY}").get_data(as_text=True)
-    assert 'name="map_link"' in html and "data-optional" in html and 'type="url"' in html
+    assert 'name="map_link"' in html and "data-optional" in html and 'type="url"' not in html
     assert '<span class="tag" data-tag="map_link"' not in html
 
 

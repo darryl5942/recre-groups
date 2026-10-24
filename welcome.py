@@ -84,16 +84,34 @@ def save_templates(**values):
     store.update_config(welcome_templates={k: values.get(k, current[k]) for k in DEFAULTS})
 
 
+def normalize_link(url):
+    """'google.com/maps/...' -> 'https://google.com/maps/...'; '' if it isn't a web link.
+
+    Brackets are encoded so the link survives the [text](link) form.
+    """
+    url = (url or "").strip()
+    if not url or re.search(r"\s", url):
+        return ""
+    if not re.match(r"https?://", url, re.I):
+        if not re.match(r"(www\.)?[\w-]+(\.[\w-]+)*\.[a-z]{2,}(/|$|\?)", url, re.I):
+            return ""
+        url = "https://" + url
+    if not re.match(r"https?://[\w-]+(\.[\w-]+)*\.[a-z]{2,}", url, re.I):
+        return ""
+    return url.replace("(", "%28").replace(")", "%29")
+
+
 def is_link(url):
-    return bool(re.match(r"https?://\S+$", (url or "").strip()))
+    return bool(normalize_link(url))
 
 
 def fill(template, values):
     """Put the session details into a template. With a map link, the location
     becomes [Ground Up](https://...), which is sent as a clickable link."""
     values = dict(values)
-    if is_link(values.get("map_link")) and values.get("location"):
-        values["location"] = f"[{values['location']}]({values['map_link'].strip()})"
+    link = normalize_link(values.get("map_link"))
+    if link and values.get("location"):
+        values["location"] = f"[{values['location']}]({link})"
     for k, v in values.items():
         template = template.replace("{" + k + "}", str(v))
     return template
@@ -196,5 +214,6 @@ def remember_place(values):
     places = cfg.get("places", {})
     if values.get("location"):
         places[values["location"].lower()] = {
-            k: values.get(k, "") for k in ("mrt", "loc_short", "meet_point", "map_link")}
+            **{k: values.get(k, "") for k in ("mrt", "loc_short", "meet_point")},
+            "map_link": normalize_link(values.get("map_link"))}
     store.update_config(places=places, meet_point=values.get("meet_point") or DEFAULT_MEET_POINT)
