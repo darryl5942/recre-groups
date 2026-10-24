@@ -35,6 +35,7 @@
         <label>{{ k.replace("_", " ")|capitalize }}
           {% if k in examples %}<span class="tag" data-tag="{{ k }}">example</span>{% endif %}
           <input name="{{ k }}" value="{{ values[k] }}" placeholder="{{ desc }}" data-field
+                 {% if k in optional %}data-optional{% endif %}{% if k == "map_link" %} type="url"{% endif %}
                  class="{% if k in examples %}example{% endif %}">
         </label>
       {% endfor %}
@@ -43,7 +44,9 @@
 
   <section class="card">
     <h2>Messages</h2>
-    <p class="muted small">Leave a message empty to skip it.</p>
+    <p class="muted small">Leave a message empty to skip it.
+      Links look like <code>[Ground Up](https://maps.app.goo.gl/...)</code> here; in Telegram only "Ground Up" shows, as a clickable link.
+      You can add your own links the same way.</p>
     <label>1. Welcome message <a href="#" class="refill small" data-for="welcome_text">↺ redo from template</a>
       <textarea name="welcome_text" id="welcome_text" rows="14" data-template="welcome"></textarea>
     </label>
@@ -78,7 +81,11 @@
   const edited = new Set();  // messages the captain changed by hand stay as they are
 
   function values() {
-    return Object.fromEntries(fields.map(f => [f.name, f.value.trim()]));
+    const v = Object.fromEntries(fields.map(f => [f.name, f.value.trim()]));
+    if (/^https?:\/\/\S+$/.test(v.map_link || "") && v.location) {
+      v.location = `[${v.location}](${v.map_link})`;  // sent as a clickable link
+    }
+    return v;
   }
   function fillAll() {
     const v = values();
@@ -86,7 +93,7 @@
       if (edited.has(out.id)) continue;
       out.value = templates[out.dataset.template].replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
     }
-    for (const f of fields) f.classList.toggle("missing", !f.value.trim());
+    for (const f of fields) f.classList.toggle("missing", !f.value.trim() && !("optional" in f.dataset));
   }
   fields.forEach(f => f.addEventListener("input", () => {
     f.classList.remove("example");  // edited, so no longer a sample value
@@ -112,7 +119,13 @@
 
   document.getElementById("msgform").addEventListener("submit", e => {
     const label = f => f.name.replace("_", " ");
-    const empty = fields.filter(f => !f.value.trim()).map(label);
+    const empty = fields.filter(f => !f.value.trim() && !("optional" in f.dataset)).map(label);
+    const map = fields.find(f => f.name === "map_link");
+    if (map && map.value.trim() && !/^https?:\/\/\S+$/.test(map.value.trim())) {
+      alert("The map link should start with https:// (copy it from Google Maps → Share → Copy link).");
+      e.preventDefault();
+      return;
+    }
     const samples = fields.filter(f => f.classList.contains("example")).map(label);
     const problems = [];
     if (samples.length) problems.push("still showing example values: " + samples.join(", "));

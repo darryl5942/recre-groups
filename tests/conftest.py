@@ -140,7 +140,10 @@ class FakeTelegram:
     async def get_participants(self, group):
         return [SimpleNamespace(id=uid) for uid in self.members[group.id]]
 
-    async def send_message(self, entity, message=None, file=None, link_preview=True, schedule=None):
+    async def send_message(self, entity, message=None, file=None, link_preview=True, schedule=None,
+                           formatting_entities=None):
+        if formatting_entities:
+            self.links = getattr(self, "links", []) + [(message, formatting_entities)]
         if schedule is not None:
             self.scheduled.append((entity.id, schedule, file.poll if file else message))
             self._next_id += 1

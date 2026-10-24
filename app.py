@@ -284,7 +284,8 @@ def messages():
     default_when = (datetime.now() + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
     history = [dict(m, at=datetime.fromisoformat(m["at"]).astimezone()) for m in rec.get("messages", [])]
     return render_template("messages.html", key=key, rec=rec, group=group, values=values, examples=examples,
-                           placeholders=welcome.PLACEHOLDERS, templates=welcome.templates(),
+                           placeholders=welcome.PLACEHOLDERS, optional=welcome.OPTIONAL,
+                           templates=welcome.templates(),
                            history=history, pending_pins=len(rec.get("pending_pins") or []),
                            default_when=default_when.strftime("%Y-%m-%dT%H:%M"), me=tg.run(tg.me()))
 

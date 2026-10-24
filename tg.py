@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from telethon import TelegramClient, errors, functions, types, utils
 
 import store
+import welcome
 
 _loop = asyncio.new_event_loop()
 threading.Thread(target=_loop.run_forever, daemon=True).start()
@@ -370,6 +371,14 @@ async def record_group(key):
     return rec, group
 
 
+async def _send_text(client, group, text, when):
+    """Send text where [words](https://...) become clickable links."""
+    plain, links = welcome.parse_links(text.strip())
+    entities = [types.MessageEntityTextUrl(offset, length, url) for offset, length, url in links]
+    return await client.send_message(group, plain, formatting_entities=entities or None,
+                                     link_preview=False, schedule=when)
+
+
 async def send_messages(key, posts, when=None, pin=True):
     """Send (or schedule for `when`) the welcome message, meeting message and poll.
 
@@ -388,21 +397,22 @@ async def send_messages(key, posts, when=None, pin=True):
     sent = []
     try:
         if posts["welcome"].strip():
-            msg = await client.send_message(group, posts["welcome"], link_preview=False, schedule=when)
+            msg = await _send_text(client, group, posts["welcome"], when)
             sent.append("welcome message")
             if pin and when is None:
                 await client.pin_message(group, msg, notify=True)
             elif pin:
                 rec.setdefault("pending_pins", []).append(
-                    {"at": when.isoformat(), "text": posts["welcome"].strip()})
+                    {"at": when.isoformat(), "text": welcome.parse_links(posts["welcome"].strip())[0]})
         if posts["meet"].strip():
-            await client.send_message(group, posts["meet"], link_preview=False, schedule=when)
+            await _send_text(client, group, posts["meet"], when)
             sent.append("meeting message")
-        options = [o.strip() for o in posts["poll_options"] if o.strip()][:10]
-        if posts["poll_question"].strip() and len(options) >= 2:
+        options = [welcome.strip_links(o).strip() for o in posts["poll_options"] if o.strip()][:10]
+        question = welcome.strip_links(posts["poll_question"]).strip()
+        if question and len(options) >= 2:
             poll = types.Poll(
                 id=random.getrandbits(62), hash=0, public_voters=True,
-                question=types.TextWithEntities(posts["poll_question"].strip()[:255], []),
+                question=types.TextWithEntities(question[:255], []),
                 answers=[types.PollAnswer(types.TextWithEntities(o[:100], []), bytes([i]))
                          for i, o in enumerate(options)])
             await client.send_message(group, file=types.InputMediaPoll(poll), schedule=when)

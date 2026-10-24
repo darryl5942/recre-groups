@@ -15,6 +15,7 @@ PLACEHOLDERS = {
     "time": "e.g. 7.30pm-9.30pm",
     "start": "Start time, e.g. 7.30pm",
     "location": "Full place name, e.g. Ground Up",
+    "map_link": "Google Maps link (optional): makes the place name clickable",
     "loc_short": "Short place name, e.g. GU",
     "mrt": "Nearest MRT, e.g. NE8 Farrer Park",
     "meet_point": "Where to meet in school, e.g. Bencoolen Exit C",
@@ -66,7 +67,10 @@ SAFETY STUFF:
     "poll_options": "{meet_point} @ {meet_time}\n{loc_short} @ {start}",
 }
 
+OPTIONAL = {"map_link"}  # fine to leave empty
+
 DEFAULT_MEET_POINT = "Bencoolen Exit C"
+_LINK = re.compile(r"\[([^\[\]\n]+)\]\((https?://[^\s()]+)\)")  # [text](https://...)
 MEET_EARLY = timedelta(minutes=30)
 
 
@@ -80,10 +84,45 @@ def save_templates(**values):
     store.update_config(welcome_templates={k: values.get(k, current[k]) for k in DEFAULTS})
 
 
+def is_link(url):
+    return bool(re.match(r"https?://\S+$", (url or "").strip()))
+
+
 def fill(template, values):
+    """Put the session details into a template. With a map link, the location
+    becomes [Ground Up](https://...), which is sent as a clickable link."""
+    values = dict(values)
+    if is_link(values.get("map_link")) and values.get("location"):
+        values["location"] = f"[{values['location']}]({values['map_link'].strip()})"
     for k, v in values.items():
         template = template.replace("{" + k + "}", str(v))
     return template
+
+
+def _utf16_len(text):
+    return len(text.encode("utf-16-le")) // 2  # Telegram counts emoji as 2
+
+
+def parse_links(text):
+    """'[Ground Up](https://...)' -> ('Ground Up', [(offset, length, url)]).
+
+    Only this link form is special; everything else is sent exactly as typed.
+    Offsets are in UTF-16 units, as Telegram expects.
+    """
+    plain, links, last = [], [], 0
+    for m in _LINK.finditer(text):
+        plain.append(text[last:m.start()])
+        offset = _utf16_len("".join(plain))
+        plain.append(m.group(1))
+        links.append((offset, _utf16_len(m.group(1)), m.group(2)))
+        last = m.end()
+    plain.append(text[last:])
+    return "".join(plain), links
+
+
+def strip_links(text):
+    """Polls can't contain links: keep just the link text."""
+    return _LINK.sub(lambda m: m.group(1), text)
 
 
 def _parse_time(token, ampm_fallback=None):
@@ -134,6 +173,7 @@ def guess(option_text, poll_date):
 
     remembered = store.load_config().get("places", {}).get(values["location"].lower(), {})
     values["mrt"] = remembered.get("mrt", "")
+    values["map_link"] = remembered.get("map_link", "")
     values["loc_short"] = remembered.get("loc_short", values["location"])
     values["meet_point"] = remembered.get("meet_point") or \
         store.load_config().get("meet_point", DEFAULT_MEET_POINT)
@@ -156,5 +196,5 @@ def remember_place(values):
     places = cfg.get("places", {})
     if values.get("location"):
         places[values["location"].lower()] = {
-            k: values.get(k, "") for k in ("mrt", "loc_short", "meet_point")}
+            k: values.get(k, "") for k in ("mrt", "loc_short", "meet_point", "map_link")}
     store.update_config(places=places, meet_point=values.get("meet_point") or DEFAULT_MEET_POINT)

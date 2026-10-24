@@ -212,7 +212,7 @@ def test_messages_page_unreadable_option_uses_examples(client, fake):
     fake.extra_polls = [fake.poll_message(msg_id=77, options={OPT_B: "Friday session (TBC)"})]
     tg.run(tg.run_option(CHAT, 77, OPT_B.hex(), "Friday", 20, "{link}", progress=lambda *a: None))
     html = client.get(f"/messages?key={CHAT}:77:{OPT_B.hex()}").get_data(as_text=True)
-    assert html.count('<span class="tag" data-tag=') == len(welcome.PLACEHOLDERS) - 1
+    assert html.count('<span class="tag" data-tag=') == len(welcome.PLACEHOLDERS) - 1 - len(welcome.OPTIONAL)
     assert 'value="NE8 Farrer Park"' in html
 
 
@@ -286,3 +286,52 @@ def test_results_page_links_to_messages(client, fake):
         time.sleep(0.05)
     html = client.get(loc).get_data(as_text=True)
     assert f"/messages?key={KEY.replace(':', '%3A')}" in html or f"/messages?key={KEY}" in html
+
+
+# ---------------------------------------------------------------- map links
+
+MAP = "https://maps.app.goo.gl/AbC123"
+
+
+def test_location_sent_as_clickable_link(fake, group):
+    send(dict(POSTS, welcome=f"Hi 🧗\n[28 Oct] @ [Ground Up]({MAP})", meet=f"Meet at [GU]({MAP})"))
+    posts = fake.group_posts[group]
+    assert posts[0] == "Hi 🧗\n[28 Oct] @ Ground Up" and posts[1] == "Meet at GU"
+    (text, (entity,)), (_, (meet_entity,)) = fake.links
+    assert isinstance(entity, types.MessageEntityTextUrl) and entity.url == MAP
+    assert text.encode("utf-16-le")[entity.offset * 2:(entity.offset + entity.length) * 2].decode("utf-16-le") == "Ground Up"
+    assert meet_entity.offset == len("Meet at ")
+
+
+def test_links_removed_from_poll(fake, group):
+    send(dict(POSTS, poll_question=f"Meet where @ [GU]({MAP})?", poll_options=[f"[GU]({MAP}) @ 4pm", "School"]))
+    poll = fake.group_posts[group][2]
+    assert poll.question.text == "Meet where @ GU?"
+    assert poll.answers[0].text.text == "GU @ 4pm"
+
+
+def test_scheduled_linked_welcome_still_gets_pinned(fake, group, monkeypatch):
+    when = soon()
+    send(dict(POSTS, welcome=f"[28 Oct] @ [Ground Up]({MAP})"), when=when)
+    assert store.get_record(KEY)["pending_pins"][0]["text"] == "[28 Oct] @ Ground Up"
+    for gid, w, content in fake.scheduled:  # Telegram delivers the plain text
+        pass
+    fake.deliver_scheduled()
+
+    class Later(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return when + timedelta(minutes=1)
+    monkeypatch.setattr(tg, "datetime", Later)
+    assert tg.run(tg.pin_due()) == 1
+
+
+def test_messages_page_has_optional_map_link(client, fake, group):
+    html = client.get(f"/messages?key={KEY}").get_data(as_text=True)
+    assert 'name="map_link"' in html and "data-optional" in html and 'type="url"' in html
+    assert '<span class="tag" data-tag="map_link"' not in html
+
+
+def test_map_link_remembered_from_page(client, fake, group):
+    client.post("/messages", data=form(location="B+ Aperia", map_link=MAP))
+    assert f'value="{MAP}"' in client.get(f"/messages?key={KEY}").get_data(as_text=True)

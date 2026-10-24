@@ -135,7 +135,11 @@ To set them up:
   - Boxes outlined in yellow are empty.
 - **The messages update as you type.** You can also edit the final text directly, including the poll options.
   To undo your edits, click **↺ redo from template**. Leave a message empty to skip it.
-- **The app remembers each place.** Once you've entered the MRT, short name and meeting point for a gym, they're prefilled the next time.
+- **Make the location clickable (optional):** in Google Maps, find the gym, tap **Share → Copy link**, and paste it into **Map link**.
+  In Telegram, the location name (e.g. "Ground Up") becomes a link that opens the map. On this page it looks like
+  `[Ground Up](https://maps.app.goo.gl/...)`, but in Telegram only "Ground Up" shows. You can add your own links anywhere the same way.
+  (Polls can't have links, so they just show the name.)
+- **The app remembers each place.** Once you've entered the MRT, short name, map link and meeting point for a gym, they're prefilled the next time.
 - **To change the default wording** (e.g. "mid terms coming up"), click **Welcome templates** at the top of the page.
   Words in `{curly brackets}` are filled in for each session.
 

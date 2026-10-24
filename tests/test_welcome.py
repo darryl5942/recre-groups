@@ -102,10 +102,70 @@ def test_with_examples_fills_only_empty_boxes(fake):
     v, ex = welcome.with_examples(welcome.guess("28 Oct 730pm-930pm @B+ Aperia", OCT))
     assert v["date"] == "28 Oct" and v["location"] == "B+ Aperia"
     assert v["mrt"] == welcome.EXAMPLES["mrt"] and ex == ["mrt"]
-    assert all(v[k].strip() for k in welcome.PLACEHOLDERS)
+    assert all(v[k].strip() for k in welcome.PLACEHOLDERS if k not in welcome.OPTIONAL)
 
 
 def test_unreadable_option_is_all_examples_except_meet_point(fake):
     v, ex = welcome.with_examples(welcome.guess("Can't make it", OCT))
-    assert set(ex) == set(welcome.PLACEHOLDERS) - {"meet_point"}
+    assert set(ex) == set(welcome.PLACEHOLDERS) - {"meet_point"} - welcome.OPTIONAL
     assert "{" not in welcome.fill(welcome.DEFAULTS["welcome"], v)
+
+
+# ---------------------------------------------------------------- map links
+
+MAP = "https://maps.app.goo.gl/AbC123"
+
+
+def test_fill_links_location_when_map_link_given(fake):
+    v = {"date": "28 Oct", "time": "4.00pm-6.00pm", "location": "Ground Up", "map_link": MAP}
+    assert welcome.fill("[{date} {time}] @ {location}", v) == f"[28 Oct 4.00pm-6.00pm] @ [Ground Up]({MAP})"
+
+
+@pytest.mark.parametrize("link", ["", "   ", "maps.app.goo.gl/x", "not a link", "https://"])
+def test_fill_without_valid_map_link_keeps_plain_location(fake, link):
+    assert welcome.fill("@ {location}", {"location": "Ground Up", "map_link": link}) == "@ Ground Up"
+
+
+def test_parse_links_basic(fake):
+    plain, links = welcome.parse_links(f"[28 Oct 4.00pm-6.00pm] @ [Ground Up]({MAP})\nNearest MRT")
+    assert plain == "[28 Oct 4.00pm-6.00pm] @ Ground Up\nNearest MRT"
+    assert links == [(len("[28 Oct 4.00pm-6.00pm] @ "), len("Ground Up"), MAP)]
+
+
+def test_parse_links_offsets_count_emoji_as_two(fake):
+    plain, links = welcome.parse_links(f"🧗🧦 [GU]({MAP}) and [BP](https://x.com/y)")
+    assert plain == "🧗🧦 GU and BP"
+    assert links == [(5, 2, MAP), (5 + 2 + 5, 2, "https://x.com/y")]
+
+
+@pytest.mark.parametrize("text", [
+    "no links here", "[just brackets]", "(just parens)", "[text](not-a-url)", "[a]\n(https://x.com)",
+    "Bring socks ($6)!! 🧦", "[28 Oct 4.00pm-6.00pm] @ Ground Up",
+])
+def test_text_without_links_is_unchanged(fake, text):
+    assert welcome.parse_links(text) == (text, [])
+
+
+def test_strip_links(fake):
+    assert welcome.strip_links(f"[GU]({MAP}) @ 4.00pm") == "GU @ 4.00pm"
+
+
+def test_default_welcome_with_map_link_end_to_end(fake):
+    v = welcome.guess("28 Oct 4pm-6pm @Ground Up", OCT)
+    v.update(mrt="NE8 Farrer Park", map_link=MAP)
+    plain, links = welcome.parse_links(welcome.fill(welcome.DEFAULTS["welcome"], v))
+    assert "[28 Oct 4.00pm-6.00pm] @ Ground Up" in plain and MAP not in plain
+    (offset, length, url), = links
+    assert plain.encode("utf-16-le")[offset * 2:(offset + length) * 2].decode("utf-16-le") == "Ground Up"
+    assert url == MAP
+
+
+def test_map_link_remembered_per_place(fake):
+    welcome.remember_place({"location": "Ground Up", "map_link": MAP, "mrt": "NE8"})
+    assert welcome.guess("1 Nov 4pm-6pm @Ground Up", OCT)["map_link"] == MAP
+    assert welcome.guess("1 Nov 4pm-6pm @Elsewhere", OCT)["map_link"] == ""
+
+
+def test_map_link_never_gets_an_example_value(fake):
+    _, ex = welcome.with_examples(welcome.guess("Can't make it", OCT))
+    assert "map_link" not in ex
