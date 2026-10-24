@@ -467,6 +467,19 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
     key = store.record_key(chat_id, msg_id, option_hex)
     rec = store.get_record(key) or {"messaged": []}
 
+    if group is not None and info["found_by"] == "record" and title.strip() != group.title:
+        progress(f"Renaming the group to '{title}'")
+        try:
+            if isinstance(group, types.Chat):
+                await client(functions.messages.EditChatTitleRequest(group.id, title))
+            else:
+                await client(functions.channels.EditTitleRequest(group, title))
+            group.title = title
+        except errors.ChatNotModifiedError:
+            pass
+        except errors.RPCError as e:
+            progress(f"Couldn't rename the group ({e.__class__.__name__}); keeping its old name")
+
     created = False
     if group is None:
         progress(f"Creating group '{title}'")

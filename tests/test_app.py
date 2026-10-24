@@ -235,3 +235,23 @@ def test_templates_back_link_stays_on_site(client):
     assert "evil.example.com" not in r.headers["Location"]
 
 
+
+
+def test_option_page_keeps_current_group_name(client, fake):
+    fake.vote(OPT_A, [1])
+    tg.run(tg.run_option(CHAT, POLL_MSG, OPT_A.hex(), "Option 1", 20, "{link}", progress=lambda *a: None))
+    next(iter(fake.groups.values())).title = "Renamed in Telegram"
+    html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
+    assert 'value="Renamed in Telegram"' in html and "will be renamed" not in html
+
+
+def test_option_page_warns_about_rename(client, fake):
+    fake.vote(OPT_A, [1])
+    tg.run(tg.run_option(CHAT, POLL_MSG, OPT_A.hex(), "Option 1", 20, "{link}", progress=lambda *a: None))
+    html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}&title=New+name").get_data(as_text=True)
+    assert "will be renamed to" in html and "New name" in html
+
+
+def test_run_form_uses_name_typed_into_box(client, fake):
+    html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
+    assert 'id="title_box"' in html and 'namedItem("title").value = title' in html

@@ -163,8 +163,11 @@ def option():
     cap = max(1, request.args.get("cap", type=int) or cfg.get("cap", DEFAULT_CAP))
     poll = tg.run(tg.get_poll(chat_id, msg_id))
     option_text = poll["options"].get(opt, "")
-    title = request.args.get("title") or tg.suggest_title(option_text)
+    typed_title = (request.args.get("title") or "").strip()
+    title = typed_title or tg.suggest_title(option_text)
     info = tg.run(tg.preview(chat_id, msg_id, opt, title, cap))
+    if not typed_title and info["found_by"] == "record":
+        title = info["group"].title  # keep its current name unless the captain types a new one
     return render_template("option.html", chat_id=chat_id, msg_id=msg_id, opt=opt, cap=cap,
                            title=title, option_text=option_text, info=info,
                            dm=cfg.get("dm_template", DEFAULT_DM))

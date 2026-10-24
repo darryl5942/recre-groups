@@ -179,6 +179,14 @@ class FakeTelegram:
         if isinstance(req, functions.channels.TogglePreHistoryHiddenRequest):
             self.history_visible.add(req.channel.id)
             return None
+        if isinstance(req, functions.channels.EditTitleRequest):
+            self.groups[req.channel.id].title = req.title
+            self.renames = getattr(self, "renames", 0) + 1
+            return None
+        if isinstance(req, functions.messages.EditChatTitleRequest):
+            self.groups[req.chat_id].title = req.title
+            self.renames = getattr(self, "renames", 0) + 1
+            return None
         if isinstance(req, functions.channels.InviteToChannelRequest):
             return self._add(req.channel, req.users[0])
         if isinstance(req, functions.messages.AddChatUserRequest):

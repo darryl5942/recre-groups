@@ -8,8 +8,8 @@
   <input type="hidden" name="chat" value="{{ chat_id }}">
   <input type="hidden" name="msg" value="{{ msg_id }}">
   <input type="hidden" name="opt" value="{{ opt }}">
-  <label class="grow">Group name <input name="title" value="{{ title }}" maxlength="128"></label>
-  <label>Max people <input name="cap" type="number" min="1" value="{{ cap }}" class="small"></label>
+  <label class="grow">Group name <input name="title" id="title_box" value="{{ title }}" maxlength="128" required></label>
+  <label>Max people <input name="cap" id="cap_box" type="number" min="1" value="{{ cap }}" class="small"></label>
   <button class="secondary">Refresh</button>
 </form>
 
@@ -17,6 +17,7 @@
   <div class="flash info">
     <b>A group named "{{ info.group.title }}" already exists</b> ({{ info.member_count }} members including you).
     {% if info.found_by == "name" %}It was found by its name in your chats, not from a previous run on this computer.{% endif %}
+    {% if info.found_by == "record" and info.group.title != title %}It will be renamed to "<b>{{ title }}</b>".{% endif %}
     Only people in the first {{ cap }} who aren't in it yet will be added.
     {% if info.key %}<br><a href="{{ url_for('messages', key=info.key) }}">Send or schedule welcome messages for this group →</a>{% endif %}
   </div>
@@ -66,8 +67,18 @@
 </form>
 
 <script>
-  document.getElementById("runform").addEventListener("submit", e => {
-    e.target.querySelector("button").disabled = true;
+  // Use whatever is in the Group name / Max people boxes now, even without pressing Refresh.
+  const runform = document.getElementById("runform");
+  runform.addEventListener("submit", e => {
+    const title = document.getElementById("title_box").value.trim();
+    if (!title) {
+      alert("Type a group name first.");
+      e.preventDefault();
+      return;
+    }
+    runform.elements.namedItem("title").value = title;
+    runform.elements.namedItem("cap").value = document.getElementById("cap_box").value || "{{ cap }}";
+    runform.querySelector("button").disabled = true;
   });
 </script>
 {% endblock %}

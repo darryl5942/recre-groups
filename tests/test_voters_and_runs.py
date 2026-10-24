@@ -285,8 +285,35 @@ def test_renamed_group_still_found_from_record(fake):
     run_option(fake)
     gid = next(iter(fake.groups))
     fake.groups[gid].title = "Renamed by someone"
-    r = run_option(fake)
+    r = run_option(fake, title="Renamed by someone")
     assert not r["created"]
+    assert getattr(fake, "renames", 0) == 0
+
+
+def test_typing_a_new_name_renames_the_existing_group(fake):
+    fake.vote(OPT_A, [1])
+    run_option(fake, title="Option 1")
+    gid = next(iter(fake.groups))
+    fake.vote(OPT_A, [2])
+    r = run_option(fake, title="28 Oct Recre @ GU")
+    assert not r["created"] and len(fake.groups) == 1
+    assert fake.groups[gid].title == "28 Oct Recre @ GU"
+    assert r["title"] == "28 Oct Recre @ GU"
+    assert store.get_record(store.record_key(CHAT, POLL_MSG, OPT_A.hex()))["title"] == "28 Oct Recre @ GU"
+    assert statuses(r) == {1: "Already in group", 2: "Added"}
+
+
+def test_same_name_does_not_rename(fake):
+    fake.vote(OPT_A, [1])
+    run_option(fake, title="Option 1")
+    run_option(fake, title="Option 1")
+    assert getattr(fake, "renames", 0) == 0
+
+
+def test_first_run_uses_the_typed_name(fake):
+    fake.vote(OPT_A, [1])
+    r = run_option(fake, title="My own name")
+    assert r["created"] and next(iter(fake.groups.values())).title == "My own name"
 
 
 def test_old_basic_group_uses_basic_add(fake):
