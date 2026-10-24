@@ -2,6 +2,8 @@
 
 A small local web page that turns a Telegram poll into session groups.
 
+👉 **New here? Follow the step-by-step guide: [HowToUseMe.md](HowToUseMe.md)**
+
 1. Pick the poll (e.g. *WEEK 11 RECRE 🧗*) and one option (e.g. *28 Oct 730pm-930pm @B+ Aperia w/Darryl*).
 2. It takes the **first 20 people who voted** for that option, ordered by when they voted.
 3. It creates the group *28 Oct Recre @ B+ Aperia*, or reuses it if it already exists.
