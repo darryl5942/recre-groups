@@ -548,11 +548,15 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
         except errors.RPCError:
             stopped = "Couldn't make an invite link for this group (are you an admin of it?)."
     if missing and not stopped:
+        # Session details for {date}, {day}, {time}, {start}, {location} in the message.
+        guessed = welcome.guess(option_text, poll["date"])
+        session = {k: guessed[k] for k in ("day", "time", "start", "location")}
+        session["date"] = guessed["date"] or option_text  # fall back if the date can't be read
         to_dm = [v for v in missing if v.id not in rec["messaged"]]
         for i, v in enumerate(to_dm, 1):
             progress(f"Sending invite link {i} of {len(to_dm)}: {v.name}", i - 1, len(to_dm))
             text = _fill(dm_template, name=v.user.first_name or v.name, option=option_text,
-                         title=rec["title"], link=rec["link"])
+                         title=rec["title"], link=rec["link"], **session)
             try:
                 fail = await _dm(client, v.user, text)
             except (errors.FloodWaitError, errors.PeerFloodError):

@@ -21,7 +21,7 @@ import welcome
 
 PORT = 5050
 DEFAULT_CAP = 20
-DEFAULT_DM = ("Hi {name}! You're confirmed for {option} 🧗\n"
+DEFAULT_DM = ("Hi {name}! You're confirmed for {date} Recreational Session!🧗\n"
               "I couldn't add you to the group directly, so here's the invite link: {link}")
 
 app = Flask(__name__)

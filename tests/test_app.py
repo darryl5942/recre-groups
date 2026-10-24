@@ -255,3 +255,13 @@ def test_option_page_warns_about_rename(client, fake):
 def test_run_form_uses_name_typed_into_box(client, fake):
     html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
     assert 'id="title_box"' in html and 'namedItem("title").value = title' in html
+
+
+def test_invite_message_is_remembered_for_next_time(client, fake):
+    fake.vote(OPT_A, [1])
+    html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
+    assert "{date} Recreational Session" in html  # the new default
+    loc = client.post("/run", data=run_form(dm="Custom {date} {link}")).headers["Location"]
+    wait_for_job(client, loc)
+    html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
+    assert "Custom {date} {link}" in html

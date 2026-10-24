@@ -60,7 +60,10 @@
     <label>Sent privately to people who can't be added directly
       <textarea name="dm" rows="3">{{ dm }}</textarea>
     </label>
-    <p class="muted small">You can use {name}, {option}, {title} and {link}.</p>
+    <p class="muted small">Words in {curly brackets} are filled in for each person and session:
+      {name} (their first name), {date} (e.g. 28 Oct), {day} (e.g. Wednesday), {time} (e.g. 7.30pm-9.30pm),
+      {location}, {title} (the group name), {option} (the full poll option) and {link} (the invite link).
+      Whatever you write here is remembered for next time.</p>
   </section>
 
   <button {% if not info.voters %}disabled{% endif %}>

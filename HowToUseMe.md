@@ -99,9 +99,14 @@ Click an option, e.g. **28 Oct 730pm-930pm @B+ Aperia w/Darryl**. You'll see:
 1. The **Invite link message** box holds the message sent to people who **can't be added directly**. Edit it if you like.
    You can use these placeholders:
    - `{name}`: their first name
-   - `{option}`: the session option
+   - `{date}`: the session date, e.g. 28 Oct
+   - `{day}`, `{time}`, `{location}`: e.g. Wednesday, 7.30pm-9.30pm, B+ Aperia
    - `{title}`: the group name
+   - `{option}`: the full poll option
    - `{link}`: the invite link
+
+   Use these instead of typing the date yourself, so the same message works every week.
+   Your message is **remembered**: whatever you send is the default next time, for every session.
 2. Press **Create group and add N people** (or **Add N new people to the group**).
 3. ⏳ A progress page shows each step as it happens, e.g. *"Adding 7 of 20: Alex"*. It takes about 5 seconds per person.
    That's on purpose, so Telegram doesn't flag your account. The results appear by themselves when it's done.

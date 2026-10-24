@@ -407,3 +407,24 @@ def test_stress_many_reruns_are_stable(fake):
     assert sum(x in ("Added", "Already in group") for x in s.values()) == 20
     assert len(fake.groups) == 1
     assert fake.members[next(iter(fake.groups))] == {ME, *range(1, 21)}
+
+
+# ---------------------------------------------------------------- invite message details
+
+def test_invite_message_fills_session_details(fake):
+    fake.vote(OPT_A, [1])
+    fake.privacy_block = {1}
+    run_option(fake, dm="Hi {name}! You're confirmed for {date} Recreational Session!🧗 "
+                        "{day} {time} at {location}: {link}")
+    text = fake.dms[1][0]
+    assert text.startswith("Hi Climber1! You're confirmed for 28 Oct Recreational Session!🧗 ")
+    assert "Wednesday 7.30pm-9.30pm at B+ Aperia: https://t.me/+group" in text
+    assert "{" not in text
+
+
+def test_invite_message_date_falls_back_to_option(fake):
+    fake.extra_polls = [fake.poll_message(msg_id=77, options={OPT_A: "Friday session (TBC)"})]
+    fake.vote(OPT_A, [1])
+    fake.privacy_block = {1}
+    tg.run(tg.run_option(CHAT, 77, OPT_A.hex(), "Friday", 20, "Confirmed for {date}!", progress=lambda *a: None))
+    assert fake.dms[1][0] == "Confirmed for Friday session (TBC)!"
