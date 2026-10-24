@@ -62,11 +62,15 @@
     </label>
     <p class="muted small">Words in {curly brackets} are filled in for each person and session:
       {name} (their first name), {date} (e.g. 28 Oct), {day} (e.g. Wednesday), {time} (e.g. 7.30pm-9.30pm),
-      {location}, {title} (the group name), {option} (the full poll option) and {link} (the invite link).
-      Whatever you write here is remembered for next time.</p>
+      {location}, {title} (the group name), {option} (the full poll option) and {link} (the invite link).</p>
+    <p class="row-links">
+      <button type="submit" class="button secondary small" id="save_dm"
+              formaction="{{ url_for('save_dm') }}" formnovalidate>Save message</button>
+      <span class="muted small">Saves it as the default for every session. It's also saved whenever you add people.</span>
+    </p>
   </section>
 
-  <button {% if not info.voters %}disabled{% endif %}>
+  <button id="run_btn" {% if not info.voters %}disabled{% endif %}>
     {% if info.group %}Add {{ todo|length }} new people to the group{% else %}Create group and add {{ todo|length }} people{% endif %}
   </button>
   <p class="muted small">Every run also saves an Excel sheet of all voters and their positions.
@@ -77,6 +81,7 @@
   // Use whatever is in the Group name / Max people boxes now, even without pressing Refresh.
   const runform = document.getElementById("runform");
   runform.addEventListener("submit", e => {
+    if (e.submitter && e.submitter.id === "save_dm") return;  // just saving the message
     const title = document.getElementById("title_box").value.trim();
     if (!title) {
       alert("Type a group name first.");
@@ -85,7 +90,7 @@
     }
     runform.elements.namedItem("title").value = title;
     runform.elements.namedItem("cap").value = document.getElementById("cap_box").value || "{{ cap }}";
-    runform.querySelector("button").disabled = true;
+    document.getElementById("run_btn").disabled = true;
   });
 </script>
 {% endblock %}

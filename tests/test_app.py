@@ -265,3 +265,34 @@ def test_invite_message_is_remembered_for_next_time(client, fake):
     wait_for_job(client, loc)
     html = client.get(f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}").get_data(as_text=True)
     assert "Custom {date} {link}" in html
+
+
+def test_save_invite_message_button(client, fake):
+    page = f"/option?chat={CHAT}&msg={POLL_MSG}&opt={OPT_A.hex()}"
+    html = client.get(page).get_data(as_text=True)
+    assert 'id="save_dm"' in html and 'formaction="/save-dm"' in html
+    r = client.post("/save-dm", data=run_form(dm="Hi {name}, {date} Recre! {link}"),
+                    headers={"Referer": "http://127.0.0.1:5050" + page})
+    assert r.headers["Location"] == page
+    html = client.get(page).get_data(as_text=True)
+    assert "Invite message saved" in html
+    assert "Hi {name}, {date} Recre! {link}" in html
+    assert fake.groups == {}  # saving doesn't run anything
+
+
+def test_save_invite_message_warns_without_link(client):
+    client.post("/save-dm", data={"dm": "Hi {name}!"})
+    assert store.load_config()["dm_template"] == "Hi {name}!"
+    r = client.post("/save-dm", data={"dm": "Hi {name}!"}, headers={"Referer": "/groups"})
+    assert "has no {link}" in client.get(r.headers["Location"]).get_data(as_text=True)
+
+
+def test_save_empty_invite_message_refused(client):
+    store.update_config(dm_template="Keep me {link}")
+    client.post("/save-dm", data={"dm": "   "})
+    assert store.load_config()["dm_template"] == "Keep me {link}"
+
+
+def test_save_invite_message_ignores_offsite_referrer(client):
+    r = client.post("/save-dm", data={"dm": "x {link}"}, headers={"Referer": "https://evil.example.com/a?b"})
+    assert "evil" not in r.headers["Location"]

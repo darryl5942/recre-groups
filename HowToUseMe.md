@@ -106,7 +106,8 @@ Click an option, e.g. **28 Oct 730pm-930pm @B+ Aperia w/Darryl**. You'll see:
    - `{link}`: the invite link
 
    Use these instead of typing the date yourself, so the same message works every week.
-   Your message is **remembered**: whatever you send is the default next time, for every session.
+   Press **Save message** to keep your edits as the default for every session.
+   (It's also saved automatically whenever you add people.)
 2. Press **Create group and add N people** (or **Add N new people to the group**).
 3. ⏳ A progress page shows each step as it happens, e.g. *"Adding 7 of 20: Alex"*. It takes about 5 seconds per person.
    That's on purpose, so Telegram doesn't flag your account. The results appear by themselves when it's done.

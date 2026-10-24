@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 import webbrowser
 from functools import wraps
+from urllib.parse import urlsplit
 
 from flask import (Flask, abort, flash, jsonify, redirect, render_template, request,
                    send_from_directory, url_for)
@@ -226,6 +227,22 @@ def run():
 
     threading.Thread(target=work, daemon=True).start()
     return redirect(url_for("job_page", job_id=job_id))
+
+
+@app.post("/save-dm")
+@needs_login
+def save_dm():
+    dm = request.form.get("dm", "").strip()
+    if not dm:
+        flash("The invite message can't be empty.", "error")
+    elif "{link}" not in dm:
+        store.update_config(dm_template=dm)
+        flash("Invite message saved. Heads up: it has no {link}, so people won't get the invite link.", "error")
+    else:
+        store.update_config(dm_template=dm)
+        flash("Invite message saved. It's now the default for every session.", "info")
+    back = urlsplit(request.referrer or "")  # back to the same session page
+    return redirect(_local_path(back.path + (f"?{back.query}" if back.query else "")) or url_for("index"))
 
 
 @app.route("/job/<job_id>")
