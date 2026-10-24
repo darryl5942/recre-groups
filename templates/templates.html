@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+{% if back %}<p><a href="{{ back }}">← Back</a></p>{% endif %}
+<h1>Welcome templates</h1>
+<p class="muted">These get posted in each new group: the welcome message (pinned), then the meeting message, then the "meet where" poll.
+  Words in {curly brackets} are filled in for each session. You can still edit the final text before posting.</p>
+
+<details class="card">
+  <summary><b>Placeholders you can use</b></summary>
+  <table class="plain">
+    {% for k, desc in placeholders.items() %}<tr><td><code>{{ "{" ~ k ~ "}" }}</code></td><td class="muted">{{ desc }}</td></tr>{% endfor %}
+  </table>
+</details>
+
+<form method="post" class="card">
+  <input type="hidden" name="back" value="{{ back }}">
+  <label>1. Welcome message (pinned)
+    <textarea name="welcome" rows="18">{{ t.welcome }}</textarea>
+  </label>
+  <label>2. Meeting message
+    <textarea name="meet" rows="3">{{ t.meet }}</textarea>
+  </label>
+  <label>3. Poll question
+    <input name="poll_question" value="{{ t.poll_question }}">
+  </label>
+  <label>Poll options (one per line)
+    <textarea name="poll_options" rows="3">{{ t.poll_options }}</textarea>
+  </label>
+  <button>Save templates</button>
+  <button name="reset" value="1" class="secondary"
+          onclick="return confirm('Replace your templates with the original defaults?')">Reset to defaults</button>
+</form>
+{% endblock %}

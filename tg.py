@@ -277,7 +277,8 @@ async def preview(chat_id, msg_id, option_hex, title, cap):
     key = store.record_key(chat_id, msg_id, option_hex)
     group, how = await find_group(key, title, poll["date"])
     members = await member_ids(group) if group else set()
-    messaged = set((store.get_record(key) or {}).get("messaged", []))
+    rec = store.get_record(key) or {}
+    messaged = set(rec.get("messaged", []))
     for v in voters:
         if v.position > cap:
             v.status = f"Not in first {cap}"
@@ -288,7 +289,8 @@ async def preview(chat_id, msg_id, option_hex, title, cap):
         else:
             v.status = "Will be added"
     return {"poll": poll, "voters": voters, "group": group, "found_by": how,
-            "member_count": len(members)}
+            "member_count": len(members),
+            "welcome_posted": bool(group) and how == "record" and rec.get("welcome_posted", False)}
 
 
 async def _pause(lo, hi):
@@ -344,9 +346,36 @@ def _fill(template, **values):
     return template
 
 
-async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progress=print):
-    """Create/reuse the group, add the first `cap` voters, DM the link to the rest."""
+async def _post_welcome(client, group, welcome):
+    """Post and pin the welcome message, then the meeting message and poll."""
+    if welcome["welcome"].strip():
+        msg = await client.send_message(group, welcome["welcome"], link_preview=False)
+        await client.pin_message(group, msg, notify=True)
+    if welcome["meet"].strip():
+        await client.send_message(group, welcome["meet"], link_preview=False)
+    options = [o.strip() for o in welcome["poll_options"] if o.strip()][:10]
+    if welcome["poll_question"].strip() and len(options) >= 2:
+        poll = types.Poll(
+            id=random.getrandbits(62), hash=0, public_voters=True,
+            question=types.TextWithEntities(welcome["poll_question"].strip()[:255], []),
+            answers=[types.PollAnswer(types.TextWithEntities(o[:100], []), bytes([i]))
+                     for i, o in enumerate(options)])
+        await client.send_message(group, file=types.InputMediaPoll(poll))
+
+
+def _no_progress(message, done=None, total=None):
+    print(message)
+
+
+async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template,
+                     welcome=None, progress=_no_progress):
+    """Create/reuse the group, add the first `cap` voters, DM the link to the rest.
+
+    welcome: dict of welcome/meet/poll_question/poll_options to post, or None.
+    progress(message, done, total) is called as work happens.
+    """
     client = await _get_client()
+    progress("Checking the poll")
     info = await preview(chat_id, msg_id, option_hex, title, cap)
     poll, voters, group = info["poll"], info["voters"], info["group"]
     option_text = poll["options"].get(option_hex, "")
@@ -359,6 +388,10 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
         res = await client(functions.channels.CreateChannelRequest(
             title=title, about=f"Recre: {option_text}", megagroup=True))
         group, created = res.chats[0], True
+        try:  # so people who join later still see the pinned welcome message
+            await client(functions.channels.TogglePreHistoryHiddenRequest(group, False))
+        except errors.RPCError:
+            pass
 
     rec.update(group_id=group.id, title=getattr(group, "title", title),
                poll=poll["question"], option=option_text)
@@ -366,12 +399,11 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
 
     selected = [v for v in voters if v.position <= cap]
     members = await member_ids(group)
+    to_add = [v for v in selected if v.id not in members]
     reasons = {}
     stopped = None
-    for v in selected:
-        if v.id in members:
-            continue
-        progress(f"Adding {v.name}")
+    for i, v in enumerate(to_add, 1):
+        progress(f"Adding {i} of {len(to_add)}: {v.name}", i - 1, len(to_add))
         try:
             reasons[v.id] = await _add(client, group, v.user)
         except errors.FloodWaitError as e:
@@ -383,8 +415,18 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
         await _pause(2, 4)
 
     # Don't trust the API replies alone: check who is actually in the group now.
+    progress("Checking who is in the group")
     now_members = await member_ids(group)
     missing = [v for v in selected if v.id not in now_members]
+
+    if welcome and not stopped:
+        progress("Posting the welcome messages")
+        try:
+            await _post_welcome(client, group, welcome)
+            rec["welcome_posted"] = True
+        except errors.RPCError as e:
+            stopped = f"Couldn't post the welcome messages ({e.__class__.__name__})."
+        store.save_record(key, rec)
 
     if missing and not stopped and not rec.get("link"):
         try:
@@ -393,10 +435,9 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
         except errors.RPCError:
             stopped = "Couldn't make an invite link for this group (are you an admin of it?)."
     if missing and not stopped:
-        for v in missing:
-            if v.id in rec["messaged"]:
-                continue
-            progress(f"Sending invite link to {v.name}")
+        to_dm = [v for v in missing if v.id not in rec["messaged"]]
+        for i, v in enumerate(to_dm, 1):
+            progress(f"Sending invite link {i} of {len(to_dm)}: {v.name}", i - 1, len(to_dm))
             text = _fill(dm_template, name=v.user.first_name or v.name, option=option_text,
                          title=rec["title"], link=rec["link"])
             try:
@@ -427,4 +468,5 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
 
     return {"poll": poll, "option": option_text, "voters": voters, "title": rec["title"],
             "created": created, "link": rec.get("link"), "stopped": stopped,
-            "member_count": len(now_members)}
+            "member_count": len(now_members),
+            "welcome_posted": bool(welcome) and rec.get("welcome_posted", False)}

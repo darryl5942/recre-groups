@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Working on it…</h1>
+<p class="muted">Keep this tab open. It goes a few seconds per person on purpose, so Telegram doesn't flag your account.</p>
+
+<div class="card">
+  <p id="message"><b>{{ job.message }}</b></p>
+  <div class="bar"><div id="fill"></div></div>
+  <ol id="log" class="log muted small"></ol>
+</div>
+<div id="error" class="flash error" hidden></div>
+<p id="back" hidden><a href="javascript:history.back()">← Go back</a></p>
+
+<script>
+  const fill = document.getElementById("fill");
+  async function poll() {
+    let s;
+    try {
+      s = await (await fetch("{{ url_for('job_status', job_id=job_id) }}")).json();
+    } catch (e) {
+      return setTimeout(poll, 2000);
+    }
+    if (s.done && !s.error) return location.reload();  // the same address now shows the results
+    document.getElementById("message").innerHTML = "<b></b>";
+    document.querySelector("#message b").textContent = s.message;
+    if (s.total) {
+      fill.style.width = Math.round(100 * s.step / s.total) + "%";
+      fill.classList.remove("busy");
+    } else {
+      fill.style.width = "100%";
+      fill.classList.add("busy");
+    }
+    const log = document.getElementById("log");
+    log.replaceChildren(...s.log.slice(0, -1).map(m => Object.assign(document.createElement("li"), {textContent: m})));
+    if (s.error) {
+      const box = document.getElementById("error");
+      box.textContent = s.error;
+      box.hidden = false;
+      document.getElementById("back").hidden = false;
+      fill.classList.remove("busy");
+      return;
+    }
+    setTimeout(poll, 1000);
+  }
+  poll();
+</script>
+{% endblock %}

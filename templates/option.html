@@ -42,27 +42,103 @@
   </tbody>
 </table>
 
-<form method="post" action="{{ url_for('run') }}" class="card" id="runform">
+<form method="post" action="{{ url_for('run') }}" id="runform">
   <input type="hidden" name="chat" value="{{ chat_id }}">
   <input type="hidden" name="msg" value="{{ msg_id }}">
   <input type="hidden" name="opt" value="{{ opt }}">
   <input type="hidden" name="title" value="{{ title }}">
   <input type="hidden" name="cap" value="{{ cap }}">
-  <label>Message sent to people who can't be added directly
-    <textarea name="dm" rows="3">{{ dm }}</textarea>
-  </label>
-  <p class="muted small">You can use {name}, {option}, {title} and {link}.</p>
+
+  <section class="card">
+    <h2>Welcome messages</h2>
+    <label class="check">
+      <input type="checkbox" name="post_welcome" value="1" id="post_welcome" {% if not info.welcome_posted %}checked{% endif %}>
+      Post these in the group (welcome message gets pinned)
+    </label>
+    {% if info.welcome_posted %}<p class="muted small">Already posted in this group on an earlier run. Tick only if you want to post them again.</p>{% endif %}
+
+    <div id="welcome_box">
+      <p class="muted small">Fill in the session details. The messages below update as you type.
+        MRT, short name and meeting point are remembered for each place.
+        <a href="{{ url_for('edit_templates', back=request.full_path) }}">Edit the default templates</a></p>
+      <div class="fields">
+        {% for k, desc in placeholders.items() %}
+          <label>{{ k.replace("_", " ")|capitalize }}
+            <input name="{{ k }}" value="{{ values[k] }}" placeholder="{{ desc }}" data-field>
+          </label>
+        {% endfor %}
+      </div>
+
+      <label>1. Welcome message (pinned) <a href="#" class="refill small" data-for="welcome_text">↺ redo from template</a>
+        <textarea name="welcome_text" id="welcome_text" rows="14" data-template="welcome"></textarea>
+      </label>
+      <label>2. Meeting message <a href="#" class="refill small" data-for="meet_text">↺ redo from template</a>
+        <textarea name="meet_text" id="meet_text" rows="3" data-template="meet"></textarea>
+      </label>
+      <label>3. Poll question
+        <input name="poll_question" id="poll_question" data-template="poll_question">
+      </label>
+      <label>Poll options (one per line) <a href="#" class="refill small" data-for="poll_options">↺ redo from template</a>
+        <textarea name="poll_options" id="poll_options" rows="3" data-template="poll_options"></textarea>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Invite link message</h2>
+    <label>Sent privately to people who can't be added directly
+      <textarea name="dm" rows="3">{{ dm }}</textarea>
+    </label>
+    <p class="muted small">You can use {name}, {option}, {title} and {link}.</p>
+  </section>
+
   <button {% if not info.voters %}disabled{% endif %}>
     {% if info.group %}Add {{ todo|length }} new people to the group{% else %}Create group and add {{ todo|length }} people{% endif %}
   </button>
-  <p class="muted small">Every run also saves an Excel sheet of all voters and their positions.
-    It goes slowly on purpose (a few seconds per person) so Telegram doesn't flag your account.</p>
+  <p class="muted small">Every run also saves an Excel sheet of all voters and their positions.</p>
 </form>
-<div id="working" class="flash info" hidden>Working… keep this tab open. This takes about 5 seconds per person.</div>
+
 <script>
-  document.getElementById("runform").addEventListener("submit", function () {
-    this.querySelector("button").disabled = true;
-    document.getElementById("working").hidden = false;
+  const templates = {{ templates|tojson }};
+  const fields = [...document.querySelectorAll("[data-field]")];
+  const outputs = [...document.querySelectorAll("[data-template]")];
+  const edited = new Set();  // outputs the captain changed by hand stay as they are
+
+  function values() {
+    return Object.fromEntries(fields.map(f => [f.name, f.value.trim()]));
+  }
+  function fillAll(force) {
+    const v = values();
+    for (const out of outputs) {
+      if (edited.has(out.id) && out.id !== force) continue;
+      out.value = templates[out.dataset.template].replace(/\{(\w+)\}/g, (m, k) => k in v ? v[k] : m);
+    }
+    for (const f of fields) f.classList.toggle("missing", !f.value.trim());
+  }
+  fields.forEach(f => f.addEventListener("input", () => fillAll()));
+  outputs.forEach(o => o.addEventListener("input", () => edited.add(o.id)));
+  document.querySelectorAll(".refill").forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    edited.delete(a.dataset.for);
+    fillAll();
+  }));
+
+  const box = document.getElementById("welcome_box");
+  const toggle = document.getElementById("post_welcome");
+  const showBox = () => { box.hidden = !toggle.checked; };
+  toggle.addEventListener("change", showBox);
+  showBox();
+  fillAll();
+
+  document.getElementById("runform").addEventListener("submit", e => {
+    if (toggle.checked) {
+      const empty = fields.filter(f => !f.value.trim()).map(f => f.name.replace("_", " "));
+      if (empty.length && !confirm("These details are empty: " + empty.join(", ") + ". Post anyway?")) {
+        e.preventDefault();
+        return;
+      }
+    }
+    e.target.querySelector("button:not([type=button])").disabled = true;
   });
 </script>
 {% endblock %}

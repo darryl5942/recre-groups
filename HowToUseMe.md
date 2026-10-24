@@ -94,17 +94,36 @@ Click an option, e.g. **28 Oct 730pm-930pm @B+ Aperia w/Darryl**. You'll see:
   - *"A group named … already exists"*: only new people will be added to it.
 - **Each person's status**: *Will be added*, *Already in group*, *Link sent earlier* or *Not in first 20*
 
-### Step 5: Check the message, then press the button
-1. The text box holds the message sent to people who **can't be added directly**. Edit it if you like.
+### Step 5: Check the welcome messages
+In a new group, the app posts three things:
+1. **The welcome message**, which gets pinned: date, location, nearest MRT, things to bring and safety rules
+2. **The meeting message**, e.g. "meet us at GU @ 4.00pm or in school at Bencoolen Exit C @ 3.30pm"
+3. **The "Meet where!!!" poll**, with one option per meeting point
+
+To set them up:
+- **Fill in the session details:** day, date, time, location, short name (e.g. `GU`), nearest MRT, school meeting point and meeting time.
+  Most of these are prefilled from the poll option. The meeting time defaults to 30 minutes before the start.
+  Boxes outlined in yellow are empty.
+- **The messages update as you type.** You can also edit the final text directly, including the poll options.
+  To undo your edits, click **↺ redo from template**.
+- **The app remembers each place.** Once you've entered the MRT, short name and meeting point for a gym, they're prefilled the next time.
+- **To change the default wording** (e.g. "mid terms coming up"), click **Welcome templates** at the top of the page.
+  Words in `{curly brackets}` are filled in for each session.
+- **If the group already got these messages on an earlier run,** the box is unticked so nothing is posted twice.
+  Tick it if you do want to post them again.
+
+### Step 6: Check the invite message, then press the button
+1. The **Invite link message** box holds the message sent to people who **can't be added directly**. Edit it if you like.
    You can use these placeholders:
    - `{name}`: their first name
    - `{option}`: the session option
    - `{title}`: the group name
    - `{link}`: the invite link
 2. Press **Create group and add N people** (or **Add N new people to the group**).
-3. ⏳ **Keep the tab open.** It takes about 5 seconds per person. That's on purpose, so Telegram doesn't flag your account.
+3. ⏳ A progress page shows each step as it happens, e.g. *"Adding 7 of 20: Alex"*. It takes about 5 seconds per person.
+   That's on purpose, so Telegram doesn't flag your account. The results appear by themselves when it's done.
 
-### Step 6: Check the results
+### Step 7: Check the results
 The results page shows each person's final status:
 
 | Status | Meaning | What you do |
@@ -117,14 +136,14 @@ The results page shows each person's final status:
 
 Click **Download Excel sheet** to get the full list with positions, handles and vote times.
 
-### Step 7: Do the other session
-Go back with **← All polls** and repeat Steps 4–6 for the other option.
+### Step 8: Do the other session
+Go back with **← All polls** and repeat Steps 4–7 for the other option.
 
 ---
 
 ## Part 3: Running it again during the week
 
-More people voted since your last run? Just do Steps 2–6 again for the same option.
+More people voted since your last run? Just do Steps 2–7 again for the same option.
 - It **finds the existing group** and only adds new people who are in the top 20.
 - It **won't message anyone twice**.
 - Each run adds a **new tab** to that group's Excel sheet, so you can compare positions over time.
@@ -168,4 +187,6 @@ If you downloaded it with `git clone`, just run `git pull` in the folder instead
 - **`data/`** holds your Telegram login. Anyone with this folder can use your account. Never send it to anyone or upload it.
 - **`exports/`** holds members' Telegram handles. Share these sheets only with other captains.
 
-Both folders are excluded from git, so they never get uploaded to GitHub.
+The app **creates both folders by itself** the first time it starts, so there's nothing to set up.
+Each captain's computer gets its own: downloading the app from GitHub never includes anyone else's login, chats or sheets,
+because both folders are excluded from git and never get uploaded.
