@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-{% if back %}<p><a href="{{ back }}">← Back</a></p>{% endif %}
+<p>
+  {% if back %}<a href="{{ back }}">← Back to the session</a> · {% endif %}
+  <a href="{{ url_for('index') }}">← Home</a>
+</p>
 <h1>Welcome templates</h1>
 <p class="muted">These get posted in each new group: the welcome message (pinned), then the meeting message, then the "meet where" poll.
   Words in {curly brackets} are filled in for each session. You can still edit the final text before posting.</p>
