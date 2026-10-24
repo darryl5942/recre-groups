@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<p>
-  {% if back %}<a href="{{ back }}">← Back to the session</a> · {% endif %}
-  <a href="{{ url_for('index') }}">← Home</a>
+<p class="row-links">
+  {% if back %}<a class="button secondary" href="{{ back }}">← Back to the session</a>{% endif %}
+  <a class="button secondary" href="{{ url_for('index') }}">← Home</a>
 </p>
 <h1>Welcome templates</h1>
 <p class="muted">These get posted in each new group: the welcome message (pinned), then the meeting message, then the "meet where" poll.

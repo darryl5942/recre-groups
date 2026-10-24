@@ -36,9 +36,9 @@ def write_run(title, voters, cap):
         cell.font = Font(bold=True)
     grey = PatternFill("solid", fgColor="EEEEEE")
     for v in voters:
-        ws.append([v.position, v.name, v.handle or "(no handle)", v.id,
+        ws.append(["Exco" if v.exco else v.position, v.name, v.handle or "(no handle)", v.id,
                    v.voted_at.strftime("%d %b %Y %H:%M:%S"), v.status, getattr(v, "note", "")])
-        if v.position > cap:
+        if not v.gets_in(cap):
             for cell in ws[ws.max_row]:
                 cell.fill = grey
     for i, w in enumerate(WIDTHS):

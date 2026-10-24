@@ -31,9 +31,14 @@ class TgError(Exception):
 
 @dataclass
 class Voter:
-    position: int
+    position: int | None  # None for exco: they don't take one of the spots
     user: types.User
     voted_at: datetime
+    exco: bool = False
+
+    def gets_in(self, cap):
+        """Exco always get in; everyone else only within the first `cap`."""
+        return self.exco or self.position <= cap
 
     @property
     def id(self):
@@ -204,7 +209,12 @@ async def get_poll(chat_id, msg_id):
 
 
 async def get_voters(chat_id, msg_id, option_hex):
-    """Everyone who picked this option, earliest vote first (you excluded)."""
+    """Everyone who picked this option, earliest vote first (you excluded).
+
+    Exco members (by Telegram handle) are listed but not numbered, so they
+    don't use up any of the spots.
+    """
+    exco = store.exco_handles()
     client = await _get_client()
     peer = await client.get_input_entity(chat_id)
     my_id = (await client.get_me()).id
@@ -231,13 +241,17 @@ async def get_voters(chat_id, msg_id, option_hex):
     # votes cast in the same second in their true order.
     # A vote with no time (rare) goes to the back and shows as cast just now.
     never = datetime.now(timezone.utc)
-    seen, ordered = set(), []
+    seen, ordered, position = set(), [], 0
     for v in sorted(reversed(votes), key=lambda v: (v.date is None, v.date or never)):
         uid = getattr(v.peer, "user_id", None)
         if uid is None or uid == my_id or uid in seen or uid not in users:
             continue
         seen.add(uid)
-        ordered.append(Voter(len(ordered) + 1, users[uid], (v.date or never).astimezone()))
+        is_exco = (users[uid].username or "").lower() in exco
+        if not is_exco:
+            position += 1
+        ordered.append(Voter(None if is_exco else position, users[uid], (v.date or never).astimezone(),
+                             exco=is_exco))
     return ordered
 
 
@@ -285,7 +299,7 @@ async def preview(chat_id, msg_id, option_hex, title, cap):
     rec = store.get_record(key) or {}
     messaged = set(rec.get("messaged", []))
     for v in voters:
-        if v.position > cap:
+        if not v.gets_in(cap):
             v.status = f"Not in first {cap}"
         elif v.id in members:
             v.status = "Already in group"
@@ -505,7 +519,7 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
                poll=poll["question"], option=option_text, poll_date=poll["date"].isoformat())
     store.save_record(key, rec)
 
-    selected = [v for v in voters if v.position <= cap]
+    selected = [v for v in voters if v.gets_in(cap)]
     members = await member_ids(group)
     to_add = [v for v in selected if v.id not in members]
     reasons = {}
@@ -553,7 +567,7 @@ async def run_option(chat_id, msg_id, option_hex, title, cap, dm_template, progr
 
     messaged = set(rec["messaged"])
     for v in voters:
-        if v.position > cap:
+        if not v.gets_in(cap):
             v.status = f"Not in first {cap}"
         elif v.id in members:
             v.status = "Already in group"

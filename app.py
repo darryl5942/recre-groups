@@ -135,6 +135,19 @@ def index():
                            polls=polls, me=tg.run(tg.me()))
 
 
+@app.route("/exco", methods=["GET", "POST"])
+@needs_login
+def exco():
+    if request.method == "POST":
+        handles, bad = store.parse_handles(request.form.get("handles", ""))
+        store.update_config(exco=handles)
+        flash(f"Saved {len(handles)} exco handle{'s' if len(handles) != 1 else ''}.", "info")
+        if bad:
+            flash("These don't look like Telegram handles, so they were skipped: " + ", ".join(bad), "error")
+        return redirect(url_for("exco"))
+    return render_template("exco.html", handles=sorted(store.exco_handles()))
+
+
 @app.route("/templates", methods=["GET", "POST"])
 @needs_login
 def edit_templates():

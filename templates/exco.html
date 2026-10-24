@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a class="button secondary" href="{{ url_for('index') }}">← Home</a></p>
+<h1>Exco</h1>
+<p class="muted">Exco members who vote for a session <b>always get added</b>, even if they voted late,
+  and they <b>don't take up any of the 20 spots</b>. Exco who don't vote aren't added.</p>
+
+<form method="post" class="card">
+  <label>Telegram handles, one per line
+    <textarea name="handles" rows="12" placeholder="@alice&#10;@bob_climbs&#10;t.me/carol">{% for h in handles %}@{{ h }}
+{% endfor %}</textarea>
+  </label>
+  <p class="muted small">You can paste @handles, plain handles or t.me links. Capital letters don't matter.
+    Someone without a Telegram handle can't be recognised; ask them to set one in Telegram → Settings → Username.</p>
+  <button>Save exco list</button>
+</form>
+
+<p class="muted small">{{ handles|length }} exco handle{{ "s" if handles|length != 1 }} saved on this computer.
+  Other captains keep their own list in their copy of the app.</p>
+{% endblock %}

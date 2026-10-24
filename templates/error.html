@@ -1,5 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="flash error">{{ message }}</div>
-<p><a href="javascript:history.back()">← Go back</a> · <a href="{{ url_for('index') }}">Home</a></p>
+<p class="row-links"><a class="button secondary" href="javascript:history.back()">← Go back</a> <a class="button secondary" href="{{ url_for('index') }}">Home</a></p>
 {% endblock %}

@@ -1,11 +1,12 @@
 """Small JSON stores kept in data/ (never committed to git).
 
-config.json  - Telegram API id/hash, last-used chat and settings
+config.json  - Telegram API id/hash, last-used chat, settings and exco handles
 records.json - which group was made for which poll option, its invite link,
                and who has already been sent that link
 """
 import json
 import os
+import re
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -42,6 +43,28 @@ def update_config(**changes):
     cfg.update(changes)
     _write(_CONFIG, cfg)
     return cfg
+
+
+_HANDLE = re.compile(r"[a-z][a-z0-9_]{3,31}$")  # Telegram usernames: 4-32 chars
+
+
+def parse_handles(text):
+    """'@Alice, t.me/bob\\ncarol' -> (['alice', 'bob', 'carol'], [entries that aren't handles])."""
+    good, bad = [], []
+    for raw in re.split(r"[\s,;]+", text or ""):
+        h = re.sub(r"^(https?://)?(www\.)?(t\.me/|telegram\.me/)", "", raw.strip(), flags=re.I).lstrip("@").lower()
+        if not h:
+            continue
+        if _HANDLE.match(h):
+            if h not in good:
+                good.append(h)
+        else:
+            bad.append(raw.strip())
+    return good, bad
+
+
+def exco_handles():
+    return set(load_config().get("exco", []))
 
 
 def record_key(chat_id, msg_id, option_hex):

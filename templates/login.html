@@ -10,11 +10,11 @@
   {% elif step == "code" %}
     <label>Code Telegram just sent you (check the Telegram app) <input name="code" required autofocus inputmode="numeric"></label>
     <button>Log in</button>
-    <p><a href="{{ url_for('login') }}">Use a different number / resend code</a></p>
+    <p><a class="button secondary" href="{{ url_for('login') }}">Use a different number / resend code</a></p>
   {% else %}
     <label>Your Telegram 2-step verification password <input type="password" name="password" required autofocus></label>
     <button>Log in</button>
   {% endif %}
 </form>
-<p><a href="{{ url_for('setup') }}">Change API id/hash</a></p>
+<p><a class="button secondary" href="{{ url_for('setup') }}">Change API id/hash</a></p>
 {% endblock %}

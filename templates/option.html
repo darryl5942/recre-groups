@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<p><a href="{{ url_for('index', chat=chat_id) }}">← All polls</a></p>
+<p class="row-links"><a class="button secondary" href="{{ url_for('index', chat=chat_id) }}">← All polls</a></p>
 <h1>{{ option_text }}</h1>
-<p class="muted">{{ info.poll.question }} · {{ info.voters|length }} voted for this option (your own vote isn't counted)</p>
+{% set exco_voters = info.voters|selectattr("exco")|list %}
+<p class="muted">{{ info.poll.question }} · {{ info.voters|length }} voted for this option
+  {% if exco_voters %}({{ exco_voters|length }} exco, who always get in and don't use up spots){% endif %}
+  · your own vote isn't counted</p>
 
 <form method="get" class="card row">
   <input type="hidden" name="chat" value="{{ chat_id }}">
@@ -18,8 +21,8 @@
     <b>A group named "{{ info.group.title }}" already exists</b> ({{ info.member_count }} members including you).
     {% if info.found_by == "name" %}It was found by its name in your chats, not from a previous run on this computer.{% endif %}
     {% if info.found_by == "record" and info.group.title != title %}It will be renamed to "<b>{{ title }}</b>".{% endif %}
-    Only people in the first {{ cap }} who aren't in it yet will be added.
-    {% if info.key %}<br><a href="{{ url_for('messages', key=info.key) }}">Send or schedule welcome messages for this group →</a>{% endif %}
+    Only people in the first {{ cap }} (plus exco) who aren't in it yet will be added.
+    {% if info.key %}<p class="row-links"><a class="button secondary small" href="{{ url_for('messages', key=info.key) }}">Welcome messages for this group →</a></p>{% endif %}
   </div>
 {% else %}
   <div class="flash info">No group for this option yet. A new group "<b>{{ title }}</b>" will be created.</div>
@@ -31,11 +34,12 @@
   <thead><tr><th>#</th><th>Name</th><th>Handle</th><th>Voted at</th><th>Status</th></tr></thead>
   <tbody>
   {% for v in info.voters %}
-    <tr class="{% if v.position > cap %}dim{% endif %}">
-      <td>{{ v.position }}</td><td>{{ v.name }}</td><td>{{ v.handle or "—" }}</td>
+    <tr class="{% if not v.gets_in(cap) %}dim{% endif %}">
+      <td>{% if v.exco %}<span class="tag exco">exco</span>{% else %}{{ v.position }}{% endif %}</td>
+      <td>{{ v.name }}</td><td>{{ v.handle or "—" }}</td>
       <td>{{ v.voted_at.strftime("%d %b %H:%M:%S") }}</td><td>{{ v.status }}</td>
     </tr>
-    {% if v.position == cap and info.voters|length > cap %}
+    {% if v.position == cap and info.voters|rejectattr("exco")|list|length > cap %}
       <tr class="cutoff"><td colspan="5">— cut-off: first {{ cap }} —</td></tr>
     {% endif %}
   {% else %}

@@ -70,6 +70,7 @@ These let the app log in to your account. Each person gets their own.
 2. ⚠️ **Turn OFF "Anonymous Voting"**, otherwise nobody can see who voted.
 3. **Vote in the poll yourself** (any option, or close the poll later). Telegram only shows who voted
    once you've voted. Your own vote is **never** counted toward the 20.
+4. Exco votes don't count toward the 20 either (see **Exco** below).
 
 > Tip: write options as `<date> <time> @<place> w/<name>` and the app names groups automatically,
 > e.g. `28 Oct Recre @ B+ Aperia`.
@@ -154,6 +155,17 @@ The page lists what's already been sent or scheduled for that group, so you don'
 
 ### Step 8: Do the other session
 Go back with **← All polls** and repeat Steps 4–7 for the other option.
+
+### Exco
+Click **Exco** at the top of any page and add the exco's Telegram handles, one per line
+(`@alice`, `alice` or `t.me/alice` all work). Then, for every session:
+- **Exco who vote always get added**, even if they voted after the first 20.
+- **They don't take up any of the 20 spots.** Their row shows an **EXCO** tag instead of a number,
+  and everyone else is numbered as if they weren't there. So with 2 exco voting, 22 people get added.
+- **Exco who don't vote aren't added.**
+
+The list is kept on your computer. Each captain sets up their own in their copy of the app.
+Exco without a Telegram handle can't be recognised. Ask them to set one in Telegram → Settings → Username.
 
 ---
 

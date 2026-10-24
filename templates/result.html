@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<p><a href="{{ url_for('index', chat=chat_id) }}">← All polls</a></p>
+<p class="row-links"><a class="button secondary" href="{{ url_for('index', chat=chat_id) }}">← All polls</a></p>
 <h1>{{ r.title }}</h1>
 <p class="muted">{{ r.option }} · {% if r.created %}group created{% else %}existing group{% endif %} · {{ r.member_count }} members now (including you)</p>
 
@@ -23,8 +23,8 @@
   <thead><tr><th>#</th><th>Name</th><th>Handle</th><th>Voted at</th><th>Status</th><th>Notes</th></tr></thead>
   <tbody>
   {% for v in r.voters %}
-    <tr class="{% if v.position > cap %}dim{% elif 'NOT REACHED' in v.status %}warn{% endif %}">
-      <td>{{ v.position }}</td><td>{{ v.name }}</td><td>{{ v.handle or "—" }}</td>
+    <tr class="{% if not v.gets_in(cap) %}dim{% elif 'NOT REACHED' in v.status %}warn{% endif %}">
+      <td>{% if v.exco %}<span class="tag exco">exco</span>{% else %}{{ v.position }}{% endif %}</td><td>{{ v.name }}</td><td>{{ v.handle or "—" }}</td>
       <td>{{ v.voted_at.strftime("%d %b %H:%M:%S") }}</td><td>{{ v.status }}</td><td>{{ v.note }}</td>
     </tr>
   {% endfor %}

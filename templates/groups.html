@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<p><a href="{{ url_for('index') }}">← Home</a></p>
+<p class="row-links"><a class="button secondary" href="{{ url_for('index') }}">← Home</a></p>
 <h1>Groups</h1>
 <p class="muted">Every session group this app has made on this computer, newest first.</p>
 
@@ -18,10 +18,11 @@
     </p>
     <p class="row-links">
       <a class="button" href="{{ url_for('messages', key=r.key) }}">Welcome messages</a>
-      <a href="{{ url_for('option', chat=r.chat_id, msg=r.msg_id, opt=r.opt) }}">Add new voters</a>
+      <a class="button secondary" href="{{ url_for('option', chat=r.chat_id, msg=r.msg_id, opt=r.opt) }}">Add new voters</a>
     </p>
   </section>
 {% else %}
-  <p class="muted">No groups yet. Pick a poll option on the <a href="{{ url_for('index') }}">home page</a> to create one.</p>
+  <p class="muted">No groups yet. Pick a poll option on the home page to create one.</p>
+  <p><a class="button" href="{{ url_for('index') }}">Go to the home page</a></p>
 {% endfor %}
 {% endblock %}

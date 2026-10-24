@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<p><a href="{{ url_for('groups') }}">← All groups</a> · <a href="{{ url_for('index') }}">Home</a></p>
+<p class="row-links"><a class="button secondary" href="{{ url_for('groups') }}">← All groups</a> <a class="button secondary" href="{{ url_for('index') }}">Home</a></p>
 <h1>{{ group.title }}</h1>
 <p class="muted">{{ rec.option }} · {{ rec.poll }}</p>
 
@@ -25,7 +25,8 @@
   <section class="card">
     <h2>Session details</h2>
     <p class="muted small">The messages below update as you type. MRT, short name and meeting point are remembered for each place.
-      <a href="{{ url_for('edit_templates', back=request.full_path) }}">Edit the default templates</a></p>
+</p>
+    <p><a class="button secondary small" href="{{ url_for('edit_templates', back=request.full_path) }}">Edit the default templates</a></p>
     {% if examples %}
       <p class="flash warn small">Boxes marked <span class="tag">example</span> couldn't be read from the poll option,
         so they show sample values. Replace them with this session's details.</p>
@@ -47,17 +48,17 @@
     <p class="muted small">Leave a message empty to skip it.
       Links look like <code>[Ground Up](https://maps.app.goo.gl/...)</code> here; in Telegram only "Ground Up" shows, as a clickable link.
       You can add your own links the same way.</p>
-    <label>1. Welcome message <a href="#" class="refill small" data-for="welcome_text">↺ redo from template</a>
+    <label>1. Welcome message <button type="button" class="refill button secondary small" data-for="welcome_text">↺ Redo from template</button>
       <textarea name="welcome_text" id="welcome_text" rows="14" data-template="welcome"></textarea>
     </label>
     <label class="check"><input type="checkbox" name="pin" value="1" checked> Pin the welcome message</label>
-    <label>2. Meeting message <a href="#" class="refill small" data-for="meet_text">↺ redo from template</a>
+    <label>2. Meeting message <button type="button" class="refill button secondary small" data-for="meet_text">↺ Redo from template</button>
       <textarea name="meet_text" id="meet_text" rows="3" data-template="meet"></textarea>
     </label>
     <label>3. Poll question
       <input name="poll_question" id="poll_question" data-template="poll_question">
     </label>
-    <label>Poll options (one per line) <a href="#" class="refill small" data-for="poll_options">↺ redo from template</a>
+    <label>Poll options (one per line) <button type="button" class="refill button secondary small" data-for="poll_options">↺ Redo from template</button>
       <textarea name="poll_options" id="poll_options" rows="3" data-template="poll_options"></textarea>
     </label>
   </section>
