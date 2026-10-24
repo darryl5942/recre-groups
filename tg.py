@@ -228,10 +228,10 @@ async def get_voters(chat_id, msg_id, option_hex):
 
     # Telegram returns newest first. Reverse, then a stable sort by time keeps
     # votes cast in the same second in their true order.
-    # A vote with no time (rare) goes to the back.
-    never = datetime(9999, 1, 1, tzinfo=timezone.utc)
+    # A vote with no time (rare) goes to the back and shows as cast just now.
+    never = datetime.now(timezone.utc)
     seen, ordered = set(), []
-    for v in sorted(reversed(votes), key=lambda v: v.date or never):
+    for v in sorted(reversed(votes), key=lambda v: (v.date is None, v.date or never)):
         uid = getattr(v.peer, "user_id", None)
         if uid is None or uid == my_id or uid in seen or uid not in users:
             continue
@@ -319,6 +319,8 @@ async def _add(client, group, user):
             return "They're in too many groups"
         except errors.UserKickedError:
             return "They were removed from this group before"
+        except errors.PeerFloodError:
+            raise  # account-wide limit: stop the whole run
         except errors.RPCError as e:
             return f"Telegram error: {e.__class__.__name__}"
 
@@ -336,6 +338,8 @@ async def _dm(client, user, text):
             raise
         except errors.UserIsBlockedError:
             return "They've blocked you"
+        except errors.PeerFloodError:
+            raise  # account-wide limit: stop the whole run
         except errors.RPCError as e:
             return f"Telegram error: {e.__class__.__name__}"
 

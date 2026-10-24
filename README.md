@@ -50,3 +50,12 @@ Your own vote is never counted toward the 20.
   If a group with the exact same name already exists in your chats, the app tells you and reuses it.
   Still, agree on which captain runs which option, so the same session doesn't get two groups.
 - **Keep the `data/` folder private.** It holds your Telegram login. It's excluded from git, so it never gets uploaded.
+
+## Running the tests
+
+The tests use a fake Telegram, so they never touch a real account:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests
+```

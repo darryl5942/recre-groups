@@ -10,6 +10,7 @@ from functools import wraps
 
 from flask import (Flask, abort, flash, jsonify, redirect, render_template, request,
                    send_from_directory, url_for)
+from werkzeug.exceptions import HTTPException
 
 import export
 import store
@@ -33,6 +34,26 @@ def show_tg_error(e):
         flash(str(e), "error")
         return redirect(request.referrer)
     return render_template("error.html", message=str(e)), 400
+
+
+@app.errorhandler(Exception)
+def show_unexpected_error(e):
+    if isinstance(e, HTTPException):
+        return e
+    app.logger.exception("Unexpected error")
+    return render_template("error.html", message=f"Something went wrong: {e.__class__.__name__}: {e}"), 500
+
+
+def _int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _local_path(url):
+    """Only follow 'back' links within this app."""
+    return url if url and url.startswith("/") and not url.startswith("//") else None
 
 
 def needs_login(view):
@@ -70,8 +91,11 @@ def login():
             tg.run(tg.send_code(phone))
             _login_phone["phone"] = phone
             return redirect(url_for("login", step="code"))
+        if not _login_phone.get("phone"):
+            flash("Start again with your phone number.", "error")
+            return redirect(url_for("login"))
         if step == "code":
-            result = tg.run(tg.sign_in(_login_phone.get("phone"), code=request.form["code"].strip()))
+            result = tg.run(tg.sign_in(_login_phone["phone"], code=request.form["code"].strip()))
         else:
             result = tg.run(tg.sign_in(None, password=request.form["password"]))
         if result == "password":
@@ -119,9 +143,9 @@ def edit_templates():
         else:
             welcome.save_templates(**request.form)
             flash("Welcome templates saved.", "info")
-        return redirect(request.form.get("back") or url_for("edit_templates"))
-    return render_template("templates.html", t=welcome.templates(),
-                           placeholders=welcome.PLACEHOLDERS, back=request.args.get("back", ""))
+        return redirect(_local_path(request.form.get("back")) or url_for("edit_templates"))
+    return render_template("templates.html", t=welcome.templates(), placeholders=welcome.PLACEHOLDERS,
+                           back=_local_path(request.args.get("back")) or "")
 
 
 @app.route("/option")
@@ -130,8 +154,11 @@ def option():
     cfg = store.load_config()
     chat_id = request.args.get("chat", type=int)
     msg_id = request.args.get("msg", type=int)
-    opt = request.args["opt"]
-    cap = request.args.get("cap", type=int) or cfg.get("cap", DEFAULT_CAP)
+    opt = request.args.get("opt", "")
+    if not chat_id or not msg_id or not opt or not all(c in "0123456789abcdef" for c in opt.lower()) \
+            or len(opt) % 2:
+        abort(400)
+    cap = max(1, request.args.get("cap", type=int) or cfg.get("cap", DEFAULT_CAP))
     poll = tg.run(tg.get_poll(chat_id, msg_id))
     option_text = poll["options"].get(opt, "")
     title = request.args.get("title") or tg.suggest_title(option_text)
@@ -150,18 +177,23 @@ def run():
         flash("A run is already in progress. Wait for it to finish first.", "error")
         return redirect(request.referrer or url_for("index"))
     f = request.form
-    chat_id, msg_id, opt = int(f["chat"]), int(f["msg"]), f["opt"]
-    cap = max(1, int(f["cap"]))
-    title = f["title"].strip()[:128]
-    dm = f["dm"]
+    chat_id, msg_id, opt = _int(f.get("chat"), 0), _int(f.get("msg"), 0), f.get("opt", "")
+    if not chat_id or not msg_id or not opt:
+        abort(400)
+    cap = max(1, _int(f.get("cap"), DEFAULT_CAP))
+    title = f.get("title", "").strip()[:128]
+    if not title:
+        flash("The group needs a name.", "error")
+        return redirect(request.referrer or url_for("index"))
+    dm = f.get("dm") or DEFAULT_DM
     store.update_config(cap=cap, dm_template=dm)
 
     posts = None
     if f.get("post_welcome"):
         welcome.remember_place({k: f.get(k, "").strip() for k in welcome.PLACEHOLDERS})
-        posts = {"welcome": f["welcome_text"], "meet": f["meet_text"],
-                 "poll_question": f["poll_question"],
-                 "poll_options": f["poll_options"].splitlines()}
+        posts = {"welcome": f.get("welcome_text", ""), "meet": f.get("meet_text", ""),
+                 "poll_question": f.get("poll_question", ""),
+                 "poll_options": f.get("poll_options", "").splitlines()}
 
     job_id = uuid.uuid4().hex
     job = _jobs[job_id] = {"done": False, "message": "Starting", "step": None, "total": None,

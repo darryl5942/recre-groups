@@ -62,7 +62,8 @@ def templates():
 
 
 def save_templates(**values):
-    store.update_config(welcome_templates={k: values[k] for k in DEFAULTS})
+    current = templates()
+    store.update_config(welcome_templates={k: values.get(k, current[k]) for k in DEFAULTS})
 
 
 def fill(template, values):

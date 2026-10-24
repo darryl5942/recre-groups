@@ -11,8 +11,15 @@ HEADERS = ["Position", "Name", "Telegram handle", "User ID", "Voted at", "Status
 WIDTHS = [10, 26, 22, 14, 20, 34, 50]
 
 
+_RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+
+
 def safe_filename(title):
-    return re.sub(r'[<>:"/\\|?*]+', "", title).strip() or "recre"
+    """A file name Windows and Mac both accept."""
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "", title).strip().rstrip(". ")
+    if not name or name.upper() in _RESERVED:
+        name = f"recre {name}".strip()
+    return name
 
 
 def write_run(title, voters, cap):
