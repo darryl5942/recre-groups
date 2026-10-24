@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="get" class="card row">
+  <label>Chat with the polls
+    <select name="chat" onchange="this.form.submit()">
+      <option value="">— choose a group —</option>
+      {% for g in groups %}
+        <option value="{{ g.id }}" {% if g.id == chat_id %}selected{% endif %}>{{ g.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+{% if chat_id and not polls %}
+  <p class="muted">No polls found in the latest messages of this chat.</p>
+{% endif %}
+
+{% for p in polls %}
+  <section class="card">
+    <h2>{{ p.question }}</h2>
+    <p class="muted">Posted {{ p.date.strftime("%a %d %b %Y, %H:%M") }}
+      {% if p.closed %}· closed{% endif %}
+      {% if p.anonymous %}· <span class="bad">anonymous poll: voters can't be seen</span>{% endif %}</p>
+    {% if not p.anonymous %}
+      <div class="options">
+        {% for o in p.options %}
+          <a class="option" href="{{ url_for('option', chat=chat_id, msg=p.msg_id, opt=o.hex) }}">
+            <span>{{ o.text }}</span>
+            <span class="count">{{ o.votes if o.votes is not none else "?" }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+{% endfor %}
+{% endblock %}

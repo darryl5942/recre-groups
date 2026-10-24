@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Log in to Telegram</h1>
+<p class="muted">This logs in as <b>your own account</b> on this computer, so groups are created by you.
+  The login is saved in the <code>data</code> folder. Never share that folder.</p>
+<form method="post" class="card">
+  {% if step == "phone" %}
+    <label>Phone number (with country code) <input name="phone" placeholder="+6591234567" required autofocus></label>
+    <button>Send login code</button>
+  {% elif step == "code" %}
+    <label>Code Telegram just sent you (check the Telegram app) <input name="code" required autofocus inputmode="numeric"></label>
+    <button>Log in</button>
+    <p><a href="{{ url_for('login') }}">Use a different number / resend code</a></p>
+  {% else %}
+    <label>Your Telegram 2-step verification password <input type="password" name="password" required autofocus></label>
+    <button>Log in</button>
+  {% endif %}
+</form>
+<p><a href="{{ url_for('setup') }}">Change API id/hash</a></p>
+{% endblock %}

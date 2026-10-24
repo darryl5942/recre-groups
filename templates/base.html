@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recre Groups</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <a class="brand" href="{{ url_for('index') }}">🧗 Recre Groups</a>
+    {% if me %}
+      <form method="post" action="{{ url_for('logout') }}" class="inline">
+        <span class="muted">Logged in as {{ me.first_name }}{% if me.username %} (@{{ me.username }}){% endif %}</span>
+        <button class="link">Log out</button>
+      </form>
+    {% endif %}
+  </header>
+  <main>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

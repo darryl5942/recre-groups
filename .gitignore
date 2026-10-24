@@ -1,0 +1,11 @@
+# Your Telegram login and records: never commit or share these
+data/
+*.session
+*.session-journal
+
+# Excel sheets with members' handles
+exports/
+
+.venv/
+__pycache__/
+*.pyc

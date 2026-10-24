@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>One-time setup</h1>
+<ol class="steps">
+  <li>Go to <a href="https://my.telegram.org" target="_blank" rel="noopener">my.telegram.org</a> and log in with your phone number.</li>
+  <li>Click <b>API development tools</b>. Fill in any app name (e.g. "Recre Groups") and platform "Desktop", then create.</li>
+  <li>Copy the <b>App api_id</b> and <b>App api_hash</b> below. They stay on this computer only.</li>
+</ol>
+<form method="post" class="card">
+  <label>API id <input name="api_id" value="{{ cfg.api_id or '' }}" required inputmode="numeric"></label>
+  <label>API hash <input name="api_hash" value="{{ cfg.api_hash or '' }}" required></label>
+  <button>Save and continue</button>
+</form>
+{% endblock %}

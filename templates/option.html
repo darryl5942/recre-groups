@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{{ url_for('index', chat=chat_id) }}">← All polls</a></p>
+<h1>{{ option_text }}</h1>
+<p class="muted">{{ info.poll.question }} · {{ info.voters|length }} voted for this option (your own vote isn't counted)</p>
+
+<form method="get" class="card row">
+  <input type="hidden" name="chat" value="{{ chat_id }}">
+  <input type="hidden" name="msg" value="{{ msg_id }}">
+  <input type="hidden" name="opt" value="{{ opt }}">
+  <label class="grow">Group name <input name="title" value="{{ title }}" maxlength="128"></label>
+  <label>Max people <input name="cap" type="number" min="1" value="{{ cap }}" class="small"></label>
+  <button class="secondary">Refresh</button>
+</form>
+
+{% if info.group %}
+  <div class="flash info">
+    <b>A group named "{{ info.group.title }}" already exists</b> ({{ info.member_count }} members including you).
+    {% if info.found_by == "name" %}It was found by its name in your chats, not from a previous run on this computer.{% endif %}
+    Only people in the first {{ cap }} who aren't in it yet will be added.
+  </div>
+{% else %}
+  <div class="flash info">No group for this option yet. A new group "<b>{{ title }}</b>" will be created.</div>
+{% endif %}
+
+{% set todo = info.voters|selectattr("status", "equalto", "Will be added")|list %}
+
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Handle</th><th>Voted at</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for v in info.voters %}
+    <tr class="{% if v.position > cap %}dim{% endif %}">
+      <td>{{ v.position }}</td><td>{{ v.name }}</td><td>{{ v.handle or "—" }}</td>
+      <td>{{ v.voted_at.strftime("%d %b %H:%M:%S") }}</td><td>{{ v.status }}</td>
+    </tr>
+    {% if v.position == cap and info.voters|length > cap %}
+      <tr class="cutoff"><td colspan="5">— cut-off: first {{ cap }} —</td></tr>
+    {% endif %}
+  {% else %}
+    <tr><td colspan="5" class="muted">Nobody has voted for this option yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<form method="post" action="{{ url_for('run') }}" class="card" id="runform">
+  <input type="hidden" name="chat" value="{{ chat_id }}">
+  <input type="hidden" name="msg" value="{{ msg_id }}">
+  <input type="hidden" name="opt" value="{{ opt }}">
+  <input type="hidden" name="title" value="{{ title }}">
+  <input type="hidden" name="cap" value="{{ cap }}">
+  <label>Message sent to people who can't be added directly
+    <textarea name="dm" rows="3">{{ dm }}</textarea>
+  </label>
+  <p class="muted small">You can use {name}, {option}, {title} and {link}.</p>
+  <button {% if not info.voters %}disabled{% endif %}>
+    {% if info.group %}Add {{ todo|length }} new people to the group{% else %}Create group and add {{ todo|length }} people{% endif %}
+  </button>
+  <p class="muted small">Every run also saves an Excel sheet of all voters and their positions.
+    It goes slowly on purpose (a few seconds per person) so Telegram doesn't flag your account.</p>
+</form>
+<div id="working" class="flash info" hidden>Working… keep this tab open. This takes about 5 seconds per person.</div>
+<script>
+  document.getElementById("runform").addEventListener("submit", function () {
+    this.querySelector("button").disabled = true;
+    document.getElementById("working").hidden = false;
+  });
+</script>
+{% endblock %}
