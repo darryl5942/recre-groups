@@ -110,6 +110,8 @@ class FakeTelegram:
         return peer
 
     async def get_entity(self, peer):
+        if isinstance(peer, types.PeerChat) and peer.chat_id in self.groups:
+            return self.groups[peer.chat_id]
         if isinstance(peer, types.PeerChannel):
             if peer.channel_id in self.groups:
                 return self.groups[peer.channel_id]
@@ -138,7 +140,7 @@ class FakeTelegram:
             yield d
 
     async def get_participants(self, group):
-        return [SimpleNamespace(id=uid) for uid in self.members[group.id]]
+        return [self.users.get(uid) or user(uid) for uid in self.members[group.id]]
 
     async def send_message(self, entity, message=None, file=None, link_preview=True, schedule=None,
                            formatting_entities=None):

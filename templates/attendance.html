@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a class="button secondary" href="{{ url_for('index') }}">← Home</a></p>
+<h1>Attendance</h1>
+<p class="muted">Counts how many session groups each person is in, so you can tick them off in the attendance sheet.
+  Every group this app makes is added to the list automatically.</p>
+
+{% if result %}
+  <section class="card">
+    <h2>Results</h2>
+    {% for key, problem in result.problems.items() %}
+      <div class="flash warn">{{ (groups|selectattr("key", "equalto", key)|first).title }}: {{ problem }}.</div>
+    {% endfor %}
+    <p class="row-links">
+      <button type="button" class="copy" data-from="sheet-data">Copy for sheet</button>
+      <span class="muted small">then in the sheet: paste into cell <b>A2</b> of the <b>App import</b> tab,
+        open the attendance tab, and choose <b>Attendance → Import from the app</b>.</span>
+    </p>
+    <textarea id="sheet-data" hidden>{{ result.sheet_data }}</textarea>
+    <p class="row-links">
+      <span class="muted">{{ result.people|length }} people across {{ result.groups|length }} groups</span>
+      <button type="button" class="copy secondary small" data-from="tsv">Copy table</button>
+    </p>
+    <textarea id="tsv" hidden>{{ result.tsv }}</textarea>
+    <table>
+      <tr><th>Tele handle</th><th>Name</th><th>Sessions</th><th>Dates</th></tr>
+      {% for p in result.people %}
+        <tr><td>{% if p.handle %}@{{ p.handle }}{% else %}<span class="bad">(no handle)</span>{% endif %}</td>
+          <td>{{ p.name }}</td><td>{{ p.groups|length }}</td>
+          <td class="muted small">{{ p.groups|map(attribute="date")|map("default", "?", true)|join(", ") }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+{% endif %}
+
+<section class="card">
+  <h2>Group list</h2>
+  <p class="muted small">The session date links each group to its column in the sheet (e.g. <b>27 Aug</b>).
+    It's read from the poll option; fix it here if it's wrong.</p>
+  <form method="post" action="{{ url_for('attendance_groups') }}">
+    {% if groups %}
+      <table>
+        <tr><th>Group</th><th>Session date</th><th></th></tr>
+        {% for g in groups %}
+          <tr><td>{{ g.title }} {% if not g.auto %}<span class="tag">added</span>{% endif %}</td>
+            <td><input class="small{% if not g.date %} missing{% endif %}" name="date:{{ g.key }}"
+                       value="{{ g.date }}" placeholder="27 Aug"></td>
+            <td><button class="secondary small" name="remove" value="{{ g.key }}">Remove</button></td></tr>
+        {% endfor %}
+      </table>
+      <p><button class="secondary">Save dates</button></p>
+    {% else %}
+      <p class="muted">No groups yet. Groups appear here once you create one, or add one below.</p>
+    {% endif %}
+    <div class="row">
+      <label class="grow">Add a group
+        <input name="add" list="chats" placeholder="Type a group name, @username or t.me link" autocomplete="off">
+        <datalist id="chats">{% for c in chats %}<option value="{{ c.name }}">{% endfor %}</datalist>
+      </label>
+      <button>Add group</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Run</h2>
+  <form method="post" action="{{ url_for('attendance_run') }}"
+        onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Counting…'">
+    <p class="muted small">Looks at everyone in each group above (it takes a second or two per group).</p>
+    <button>Run</button>
+  </form>
+</section>
+
+<details class="card">
+  <summary><b>Set up the sheet (once)</b></summary>
+  <p class="muted small">The attendance sheet can't be shared outside SMU, so the app never touches it.
+    Instead you add a small script to the sheet. It runs as you, inside your SMU account.</p>
+  <ol class="steps small">
+    <li><button type="button" class="copy secondary small" data-from="script">Copy script</button></li>
+    <li>In the attendance sheet, click <b>Extensions → Apps Script</b>.</li>
+    <li>Delete what's in the editor, paste the script, and click <b>Save</b> (the disk icon).</li>
+    <li>Close the Apps Script tab and reload the sheet. An <b>Attendance</b> menu appears next to Help.</li>
+    <li>Choose <b>Attendance → Go to the App import tab</b>. The first time, Google asks you to allow the script:
+      click <b>Continue</b> and choose your SMU account. If it says "Google hasn't verified this app", click
+      <b>Advanced → Go to … (unsafe)</b>; it's your own script. This makes the <b>App import</b> tab where you paste.</li>
+  </ol>
+  <p class="muted small">The tab needs <b>Tele Handle</b> in column A, a row of session dates above it,
+    and optionally <b>Name</b> and <b>Total</b> columns. The script puts a <b>1</b> under the date for everyone in
+    that session's group, adds people it hasn't seen before in the first empty rows, and never clears anything,
+    so importing again is safe. When the app gets an update to the script, repeat steps 1–3.</p>
+  <textarea id="script" hidden>{{ script }}</textarea>
+</details>
+
+<script>
+  for (const button of document.querySelectorAll("button.copy")) {
+    const label = button.textContent;
+    button.onclick = async () => {
+      await navigator.clipboard.writeText(document.getElementById(button.dataset.from).value);
+      button.textContent = "Copied ✓";
+      setTimeout(() => button.textContent = label, 2000);
+    };
+  }
+</script>
+{% endblock %}

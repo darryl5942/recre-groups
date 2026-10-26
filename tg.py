@@ -385,6 +385,42 @@ async def record_group(key):
     return rec, group
 
 
+async def find_group_chat(text):
+    """A group you're in, from a typed name, @username or t.me link, for the attendance list."""
+    chat_id = await resolve_chat(text)
+    client = await _get_client()
+    async for d in client.iter_dialogs():
+        if d.id == chat_id:
+            if not d.is_group or d.entity is None:
+                break
+            date = getattr(d.entity, "date", None)
+            return {"id": d.entity.id, "basic": isinstance(d.entity, types.Chat), "title": d.name,
+                    "date": date.isoformat() if date else ""}
+    raise TgError(f"'{text}' isn't a group, so it can't be counted for attendance.")
+
+
+async def attendance_members(groups):
+    """People in each group, leaving out you and bots.
+
+    Returns (group key -> [users], group key -> problem).
+    """
+    client = await _get_client()
+    me_id = (await client.get_me()).id
+    found, problems = {}, {}
+    for g in groups:
+        try:
+            group = await client.get_entity(_group_peer({"group_id": g["id"], "basic": g["basic"]}))
+            if getattr(group, "left", False):
+                raise ValueError("left")
+            people = await client.get_participants(group)
+        except (ValueError, errors.RPCError):
+            problems[g["key"]] = "Couldn't open this group (it may be deleted, or you left it)"
+            continue
+        found[g["key"]] = [p for p in people if p.id != me_id
+                           and not getattr(p, "bot", False) and not getattr(p, "deleted", False)]
+    return found, problems
+
+
 async def _send_text(client, group, text, when):
     """Send text where [words](https://...) become clickable links."""
     plain, links = welcome.parse_links(text.strip())

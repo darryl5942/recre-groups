@@ -9,12 +9,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 import webbrowser
 from functools import wraps
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import (Flask, abort, flash, jsonify, redirect, render_template, request,
                    send_from_directory, url_for)
 from werkzeug.exceptions import HTTPException
 
+import attendance
 import export
 import store
 import tg
@@ -318,6 +320,50 @@ def messages():
                            templates=welcome.templates(),
                            history=history, pending_pins=len(rec.get("pending_pins") or []),
                            default_when=default_when.strftime("%Y-%m-%dT%H:%M"), me=tg.run(tg.me()))
+
+
+def _attendance_page(**extra):
+    script = (Path(app.static_folder) / "attendance_sheet.gs").read_text(encoding="utf-8")
+    return render_template("attendance.html", groups=attendance.groups(), chats=tg.run(tg.list_groups()),
+                           script=script, me=tg.run(tg.me()), **extra)
+
+
+@app.get("/attendance")
+@needs_login
+def attendance_view():
+    return _attendance_page()
+
+
+@app.post("/attendance/groups")
+@needs_login
+def attendance_groups():
+    f = request.form
+    attendance.set_dates({k[5:]: v for k, v in f.items() if k.startswith("date:")})
+    if f.get("remove"):
+        attendance.remove_group(f["remove"])
+        flash("Removed that group from the list.", "info")
+    elif f.get("add", "").strip():
+        group = tg.run(tg.find_group_chat(f["add"]))
+        attendance.add_group(group)
+        flash(f"Added '{group['title']}'.", "info")
+    else:
+        flash("Session dates saved.", "info")
+    return redirect(url_for("attendance_view"))
+
+
+@app.post("/attendance/run")
+@needs_login
+def attendance_run():
+    groups = attendance.groups()
+    if not groups:
+        flash("The group list is empty. Add a group first.", "error")
+        return redirect(url_for("attendance_view"))
+    members, problems = tg.run(tg.attendance_members(groups))
+    counted = [g for g in groups if g["key"] in members]
+    people = attendance.tally(counted, members)
+    return _attendance_page(result={"groups": counted, "people": people, "problems": problems,
+                                    "tsv": attendance.as_tsv(counted, people),
+                                    "sheet_data": attendance.as_sheet_data(counted, people)})
 
 
 def _pin_scheduled_messages_forever():

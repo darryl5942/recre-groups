@@ -173,6 +173,27 @@ Click **Exco** at the top of any page and add the exco's Telegram handles, one p
 The list is kept on your computer. Each captain sets up their own in their copy of the app.
 Exco without a Telegram handle can't be recognised. Ask them to set one in Telegram → Settings → Username.
 
+### Attendance
+Click **Attendance** at the top of any page.
+- **Group list:** every group the app creates appears here by itself. Add any other group with **Add group**,
+  or take one off with **Remove**. Each group has a **session date** (e.g. `28 Oct`) that links it to the
+  matching date column in the sheet. Fix it if the app guessed wrong, then click **Save dates**.
+- **Set up the sheet (once):** the attendance sheet can't be shared outside SMU, so the app never touches it.
+  Open **Set up the sheet** at the bottom of the page, click **Copy script**, and paste it into the sheet under
+  **Extensions → Apps Script**. Reload the sheet and an **Attendance** menu appears. It runs as you, inside SMU.
+- **Every week:** click **Run**, then **Copy for sheet**. In the sheet, paste into cell **A2** of the
+  **App import** tab, open the attendance tab, and choose **Attendance → Import from the app**.
+  The result pops up in the bottom-right corner and is also written in cell A4 of the App import tab.
+- **New semester:** copy last semester's tab and clear the ticks. On a tab with no ticks whose dates don't match
+  your sessions, the first import replaces the dates with your sessions' dates and redoes the month headings.
+  Check the labels under the dates (CNY, Midterm…) afterwards, as those belonged to the old dates.
+  A tab that already has ticks keeps its dates, and the import stops if none of the sessions match it.
+  It finds everyone's **Tele Handle** in column A (adding new people in the first empty rows) and puts a **1**
+  under the date of every session group they're in. It never clears anything, so importing again is safe.
+  **Copy table** copies the plain counts to paste anywhere else.
+
+Your own account is in every group, so it isn't counted. Bots aren't either.
+
 ---
 
 ## Part 3: Running it again during the week
